@@ -3,9 +3,9 @@
 | WP | Title | Owner | Depends on | Status |
 | --- | --- | --- | --- | --- |
 | WP-00 | Real-language inputs | project owner | — | not started |
-| WP-01 | Skeleton and tooling | contract-architect | — | done (awaiting wave 1 review) |
-| WP-02 | Rule Set contract | contract-architect | WP-01 | done (awaiting wave 1 review) |
-| WP-03 | Example format + toylang | contract-architect | WP-02 | done (awaiting wave 1 review) |
+| WP-01 | Skeleton and tooling | contract-architect | — | done (reviewed wave 1) |
+| WP-02 | Rule Set contract | contract-architect | WP-01 | done (reviewed wave 1) |
+| WP-03 | Example format + toylang | contract-architect | WP-02 | done (reviewed wave 1) |
 | WP-04 | Rule engines | engine-builder | WP-02, WP-03 | not started |
 | WP-05 | Test runner | engine-builder | WP-04 | not started |
 | WP-06 | Skill ingestion | skill-ingester | WP-03 | not started |
