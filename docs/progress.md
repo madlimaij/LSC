@@ -3,7 +3,7 @@
 | WP | Title | Owner | Depends on | Status |
 | --- | --- | --- | --- | --- |
 | WP-00 | Real-language inputs | project owner | — | not started |
-| WP-01 | Skeleton and tooling | contract-architect | — | not started |
+| WP-01 | Skeleton and tooling | contract-architect | — | in progress |
 | WP-02 | Rule Set contract | contract-architect | WP-01 | not started |
 | WP-03 | Example format + toylang | contract-architect | WP-02 | not started |
 | WP-04 | Rule engines | engine-builder | WP-02, WP-03 | not started |
