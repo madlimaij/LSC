@@ -1,0 +1,346 @@
+{
+  "contractVersion": "1.0.0",
+  "languageId": "toylang",
+  "version": "1.0.0",
+  "compiledAt": "2026-09-24T00:00:00Z",
+  "compilerVersion": "0.1.0",
+  "sourceSkills": [
+    {
+      "path": "skills/module.md",
+      "sha256": "39602dba195534b7e2e07d2773825b8e119c023616953f48a1dc275a743462e9"
+    },
+    {
+      "path": "skills/procedure.md",
+      "sha256": "d150d2591c812bb59969fdca764d03c3909da4fbb5b1c7090e321b753ce1f273"
+    },
+    {
+      "path": "skills/call.md",
+      "sha256": "7fce3acb601fbd0408f6124f17a9740757fb5895186db53b3493b9725c98d145"
+    },
+    {
+      "path": "skills/include.md",
+      "sha256": "ffe09f36a2f4665166c0cd4217a2c5b254b45615ab2beb4934c6a99d5c236bf6"
+    },
+    {
+      "path": "skills/db-read.md",
+      "sha256": "c79a5993dd5485ef9818bab85f7853ef934c7cf8855e5030cfb138a2754bfeed"
+    },
+    {
+      "path": "skills/db-write.md",
+      "sha256": "df0324ff75b248ccffbceddba7b6a4dd15252d15ecdbe48eff2a7cd4140d7382"
+    },
+    {
+      "path": "skills/config-flag.md",
+      "sha256": "0bacd2a7c96a49fafcc331033d5e3d589b7c6ce037b8b18599a02955ed987b82"
+    },
+    {
+      "path": "skills/entry-point.md",
+      "sha256": "9a7a5888eea38cf983fcd2491c8359087c9020d958b58adfa58b9d97e626876d"
+    }
+  ],
+  "fileMatchers": [
+    "**/*.tl"
+  ],
+  "lineComment": "--",
+  "blockComment": {
+    "start": "/*",
+    "end": "*/"
+  },
+  "stringDelimiters": [
+    {
+      "start": "\"",
+      "end": "\""
+    }
+  ],
+  "rules": [
+    {
+      "id": "module-declaration",
+      "type": "module_declaration",
+      "engine": "regex",
+      "regex": {
+        "pattern": "^\\s*MODULE\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)",
+        "flags": "i",
+        "multiline": false
+      },
+      "captures": {
+        "name": "name"
+      },
+      "confidence": "high",
+      "sourceEvidence": [
+        {
+          "skill": "skills/module.md",
+          "anchor": "module-declaration",
+          "exampleIds": [
+            "module-01",
+            "module-02",
+            "module-03",
+            "module-04",
+            "module-05",
+            "module-neg-01",
+            "module-neg-02"
+          ]
+        }
+      ],
+      "tests": {
+        "passed": 7,
+        "failed": 0,
+        "failingExampleIds": []
+      },
+      "status": "validated"
+    },
+    {
+      "id": "proc-definition",
+      "type": "symbol_definition",
+      "engine": "regex",
+      "regex": {
+        "pattern": "^\\s*PROC\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)",
+        "flags": "i",
+        "multiline": false
+      },
+      "captures": {
+        "name": "name"
+      },
+      "blockEnd": {
+        "pattern": "^\\s*ENDPROC\\b",
+        "flags": "i",
+        "multiline": false
+      },
+      "confidence": "high",
+      "sourceEvidence": [
+        {
+          "skill": "skills/procedure.md",
+          "anchor": "defining-a-procedure",
+          "exampleIds": [
+            "proc-01",
+            "proc-02",
+            "proc-03",
+            "proc-04",
+            "proc-05",
+            "proc-neg-01",
+            "proc-neg-02"
+          ]
+        }
+      ],
+      "tests": {
+        "passed": 7,
+        "failed": 0,
+        "failingExampleIds": []
+      },
+      "status": "validated"
+    },
+    {
+      "id": "call-statement",
+      "type": "call",
+      "engine": "exact",
+      "exact": {
+        "tokens": [
+          "CALL",
+          "(?<callee>)"
+        ],
+        "caseSensitive": false
+      },
+      "captures": {
+        "callee": "callee"
+      },
+      "confidence": "high",
+      "sourceEvidence": [
+        {
+          "skill": "skills/call.md",
+          "anchor": "calling-a-procedure",
+          "exampleIds": [
+            "call-01",
+            "call-02",
+            "call-03",
+            "call-04",
+            "call-05",
+            "call-neg-01",
+            "call-neg-02"
+          ]
+        }
+      ],
+      "tests": {
+        "passed": 7,
+        "failed": 0,
+        "failingExampleIds": []
+      },
+      "status": "validated"
+    },
+    {
+      "id": "include-directive",
+      "type": "include",
+      "engine": "regex",
+      "regex": {
+        "pattern": "^\\s*INCLUDE\\s+\"(?<target>[^\"]+)\"",
+        "flags": "i",
+        "multiline": false
+      },
+      "captures": {
+        "target": "target"
+      },
+      "searchStrings": true,
+      "confidence": "high",
+      "sourceEvidence": [
+        {
+          "skill": "skills/include.md",
+          "anchor": "including-a-file",
+          "exampleIds": [
+            "include-01",
+            "include-02",
+            "include-03",
+            "include-04",
+            "include-05",
+            "include-neg-01",
+            "include-neg-02"
+          ]
+        }
+      ],
+      "tests": {
+        "passed": 7,
+        "failed": 0,
+        "failingExampleIds": []
+      },
+      "status": "validated"
+    },
+    {
+      "id": "db-read",
+      "type": "db_read",
+      "engine": "regex",
+      "regex": {
+        "pattern": "\\bREAD\\s+(?<table>[A-Za-z_][A-Za-z0-9_]*)",
+        "flags": "i",
+        "multiline": false
+      },
+      "captures": {
+        "table": "table"
+      },
+      "confidence": "high",
+      "sourceEvidence": [
+        {
+          "skill": "skills/db-read.md",
+          "anchor": "reading-a-table",
+          "exampleIds": [
+            "read-01",
+            "read-02",
+            "read-03",
+            "read-04",
+            "read-05",
+            "read-neg-01",
+            "read-neg-02"
+          ]
+        }
+      ],
+      "tests": {
+        "passed": 7,
+        "failed": 0,
+        "failingExampleIds": []
+      },
+      "status": "validated"
+    },
+    {
+      "id": "db-read",
+      "type": "db_write",
+      "engine": "regex",
+      "regex": {
+        "pattern": "\\bWRITE\\s+(?<table>[A-Za-z_][A-Za-z0-9_]*)",
+        "flags": "i",
+        "multiline": false
+      },
+      "captures": {
+        "table": "table"
+      },
+      "confidence": "high",
+      "sourceEvidence": [
+        {
+          "skill": "skills/db-write.md",
+          "anchor": "writing-a-table",
+          "exampleIds": [
+            "write-01",
+            "write-02",
+            "write-03",
+            "write-04",
+            "write-05",
+            "write-neg-01",
+            "write-neg-02"
+          ]
+        }
+      ],
+      "tests": {
+        "passed": 7,
+        "failed": 0,
+        "failingExampleIds": []
+      },
+      "status": "validated"
+    },
+    {
+      "id": "config-flag",
+      "type": "config_ref",
+      "engine": "regex",
+      "regex": {
+        "pattern": "\\bFLAG\\s*\\(\\s*\"(?<key>[^\"]+)\"\\s*\\)",
+        "flags": "i",
+        "multiline": false
+      },
+      "captures": {
+        "key": "key"
+      },
+      "searchStrings": true,
+      "confidence": "high",
+      "sourceEvidence": [
+        {
+          "skill": "skills/config-flag.md",
+          "anchor": "feature-flags",
+          "exampleIds": [
+            "flag-01",
+            "flag-02",
+            "flag-03",
+            "flag-04",
+            "flag-05",
+            "flag-neg-01",
+            "flag-neg-02"
+          ]
+        }
+      ],
+      "tests": {
+        "passed": 7,
+        "failed": 0,
+        "failingExampleIds": []
+      },
+      "status": "validated"
+    },
+    {
+      "id": "entry-point",
+      "type": "entry_point",
+      "engine": "regex",
+      "regex": {
+        "pattern": "^\\s*ENTRY\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*->",
+        "flags": "i",
+        "multiline": false
+      },
+      "captures": {
+        "name": "name"
+      },
+      "confidence": "high",
+      "sourceEvidence": [
+        {
+          "skill": "skills/entry-point.md",
+          "anchor": "declaring-an-entry-point",
+          "exampleIds": [
+            "entry-01",
+            "entry-02",
+            "entry-03",
+            "entry-04",
+            "entry-05",
+            "entry-neg-01",
+            "entry-neg-02"
+          ]
+        }
+      ],
+      "tests": {
+        "passed": 7,
+        "failed": 0,
+        "failingExampleIds": []
+      },
+      "status": "validated"
+    }
+  ]
+}

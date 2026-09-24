@@ -40,7 +40,8 @@ describe('command auto-registration', () => {
   it('adding one file to src/cli/commands adds a command without editing any other file', async () => {
     // Work on an untouched copy of the real CLI sources so the repository tree is never modified.
     const root = makeTempDir('lsc-cli-copy-');
-    cpSync(join(REPO_ROOT, 'src/cli'), join(root, 'src/cli'), { recursive: true });
+    // Copy all of src/: real command files import other modules (e.g. src/contract).
+    cpSync(join(REPO_ROOT, 'src'), join(root, 'src'), { recursive: true });
     cpSync(join(REPO_ROOT, 'package.json'), join(root, 'package.json'));
     symlinkSync(join(REPO_ROOT, 'node_modules'), join(root, 'node_modules'), 'dir');
 
@@ -60,7 +61,8 @@ export function configure(cmd: Command): void {
       pathToFileURL(join(root, 'src/cli/index.ts')).href
     )) as typeof CliIndex;
     const program = await copied.createProgram();
-    expect(program.commands.map((c) => c.name())).toEqual(['hello-world', 'version']);
+    const realNames = (await createProgram()).commands.map((c) => c.name());
+    expect(program.commands.map((c) => c.name())).toEqual([...realNames, 'hello-world'].sort());
 
     const g = globalThis as TestGlobal;
     delete g.__lscTestOutput;
