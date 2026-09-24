@@ -1,0 +1,23 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# lsc working state and outputs (snippet logs, caches, compile results)
+.lsc/
+out/
+
+# Real-language inputs (WP-00). They live OUTSIDE the repository and are
+# referenced through the LSC_REAL_INPUTS environment variable. These patterns
+# are a safety net in case someone copies or symlinks them into the tree.
+real-inputs/
+.real-inputs/
+lsc-real-inputs/
+*.real/
+.env
+.env.*
+
+# Editor / OS noise
+.DS_Store
+*.log
