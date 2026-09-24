@@ -1,0 +1,6 @@
+# WRITE in the string is text; the statement after ; is a write.
+polarity: positive
+expected:
+  - line: 1
+    type: db_write
+    captures: { table: invoice_history }

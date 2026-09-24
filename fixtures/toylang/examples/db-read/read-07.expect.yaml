@@ -1,0 +1,6 @@
+# Mixed-case keyword separated from the table by a tab.
+polarity: positive
+expected:
+  - line: 1
+    type: db_read
+    captures: { table: stock_levels }

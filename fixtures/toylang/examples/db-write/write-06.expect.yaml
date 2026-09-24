@@ -1,0 +1,6 @@
+# Tab between keyword and table.
+polarity: positive
+expected:
+  - line: 1
+    type: db_write
+    captures: { table: stock_levels }

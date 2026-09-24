@@ -1,0 +1,9 @@
+# Calls inside nested IF blocks. On line 4 the string contains "--", which is not a comment, so the CALL after it is real.
+polarity: positive
+expected:
+  - line: 4
+    type: call
+    captures: { callee: apply_discount }
+  - line: 7
+    type: call
+    captures: { callee: legacy_pricing }

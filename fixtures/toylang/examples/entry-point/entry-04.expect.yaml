@@ -1,0 +1,6 @@
+# A complete small module with one entry point at the end.
+polarity: positive
+expected:
+  - line: 8
+    type: entry_point
+    captures: { name: nightly_billing }

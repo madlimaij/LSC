@@ -1,0 +1,6 @@
+# A full module file: only the MODULE line is a module declaration.
+polarity: positive
+expected:
+  - line: 1
+    type: module_declaration
+    captures: { name: orders }

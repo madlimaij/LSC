@@ -1,0 +1,3 @@
+polarity: positive
+expected:
+  - { line: 1, type: db_read, captures: { table: orders } }

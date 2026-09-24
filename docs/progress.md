@@ -5,7 +5,7 @@
 | WP-00 | Real-language inputs | project owner | — | not started |
 | WP-01 | Skeleton and tooling | contract-architect | — | done (awaiting wave 1 review) |
 | WP-02 | Rule Set contract | contract-architect | WP-01 | done (awaiting wave 1 review) |
-| WP-03 | Example format + toylang | contract-architect | WP-02 | in progress |
+| WP-03 | Example format + toylang | contract-architect | WP-02 | done (awaiting wave 1 review) |
 | WP-04 | Rule engines | engine-builder | WP-02, WP-03 | not started |
 | WP-05 | Test runner | engine-builder | WP-04 | not started |
 | WP-06 | Skill ingestion | skill-ingester | WP-03 | not started |
@@ -93,3 +93,33 @@ Gates: G1 ☐ G2 ☐ G3 ☐ G4 ☐
 - Q6: Multiple line/block comment markers? The plan's single-value fields cannot express them.
 - Q7: Source file encoding (UTF-8 assumed).
 - Q8: Should consumers reject newer minor contract versions (current policy) or skip unknown rule types and fields?
+
+### WP-03 — Example format and the toylang fixture language (`contract-architect`, 2026-09-24)
+
+**What was built**
+- `src/examples/`: `schema.ts` (`ExampleSchema` and type, `ExpectedMatchSchema`, source union `inline`/`sidecar`/`review`, `normalizeCode`, `codeLineCount`, `compareExamples`, `exampleRuleType`), `build.ts` (`buildExample`, `parseExpectBlock` for WP-06's inline `yaml expect` blocks, `SidecarExpectSchema`), `sidecar.ts` (`loadSidecarExamples`), `reviews.ts` (`ReviewEntrySchema`, `loadReviews`, `parseReviews`, `stringifyReviews`), `yaml-file.ts` (YAML parsing with line numbers), `errors.ts` (`ExampleLoadError`, `formatLoadError`), `locations.ts` (`exampleLocations`), `index.ts`, and `README.md`, the format reference for WP-05/06/07/09.
+- `fixtures/toylang/`: `SPEC.md` (language, labelling conventions, example counts, trap table T1–T20 with covering examples, sample-only traps S1–S14, fixture Rule Set notes), `skills/` (8 construct Skill files + `language-basics.md`; 34 inline examples), `examples/` (40 sidecar examples in 8 construct directories), `sample-repo/` (20 `.tl` files + `docs/notes.txt`), `.gitattributes` (keeps CRLF in `sample-repo/legacy/dos_export.tl`), README.
+- `contract/fixtures/toylang.ruleset.json`: aligned with final toylang (real Skill hashes, anchors, example ids; rule changes listed in D15 item 7). Still 8 rules, both engines, `blockEnd`, `searchStrings`; now also a whole-text regex.
+- Tests in `tests/examples/`: `schema.test.ts`, `sidecar.test.ts`, `reviews.test.ts`, `toylang.test.ts`, and fixtures `tests/examples/fixtures/sidecar/<case>/` (29 directories) and `fixtures/reviews/<case>.yaml` (16 files).
+- `docs/DECISIONS.md`: D15.
+
+**Acceptance criteria**
+- Loaders produce valid `Example` records from sidecars and `reviews.yaml` — **met**. `sidecar.test.ts` › "produces complete Example records"; `reviews.test.ts` › "turns verdict false_positive into a negative example", "turns verdict correct into a positive example …"; `toylang.test.ts` › "all sidecar examples load without errors" (40 examples). `stringifyReviews` output loads back to the same entries ("writes a file that loads back to the same entries and examples"), which WP-07 needs.
+- Malformed files give readable errors — **met**. Each malformed fixture has a test asserting the exact `file:line: field: message` output: 27 sidecar cases (`sidecar.test.ts` › "malformed files give readable errors", e.g. `call/call-01.expect.yaml:5: expected[0].captures: type "call" requires capture "callee"`), 11 reviews cases plus 2 partial-load cases (`reviews.test.ts`), 18 schema invariant cases (`schema.test.ts` › "rejects: …"). "Every fixture directory/file is checked by a test" fails if someone adds a fixture without an assertion.
+- Every rule type in the contract has toylang positive and negative examples — **met**. `toylang.test.ts` › "every rule type in the contract has positive and negative examples" and "every construct has at least 5 positive and 2 negative examples": 6–7 positive and 3 negative per construct, 74 examples in total (inline + sidecar).
+- `SPEC.md` lists every trap and which example covers it — **met**. SPEC §6 (T1–T20) and §7 (S1–S14). `toylang.test.ts` › "lists every trap with at least one existing covering example (§6)", "covers the traps named in WP-03", "every sample-repo location in §7 exists".
+- Fixture Rule Set aligned with toylang — **met** for what can be checked now. `toylang.test.ts` › "sourceSkills lists every Skill file with its current SHA-256", "each rule cites an existing Skill heading and exactly the examples of one construct of its type"; `node bin/lsc.js validate-ruleset contract/fixtures/toylang.ruleset.json` → OK, 8 rules. I also checked that it matches: a throwaway implementation of CONTRACT.md §6 (masking, exact-as-regex, per-line/whole-text RE2), kept in my scratchpad and not committed, ran the fixture on all 74 examples: every positive matched exactly, and no rule matched any negative of any construct (0 failures). WP-05 repeats this with the real runner.
+- `npm run typecheck`, `npm run lint`, `npm test` — **met**. All clean; `Test Files 14 passed (14), Tests 204 passed (204)`. `npm run build` succeeds.
+
+**Deviations from the brief and why**
+1. **Fixture Rule Set rules changed, not only renamed** (D15 item 7). Final toylang needed `module` on calls (`CALL billing.apply_discount`), `kind` on definitions (`PROC`/`FUNC`), and a whole-text `db-read` rule for reads continued right after the keyword. So that both engines stay covered, `module-declaration` and `entry-point` became `exact`. This happened before G1, so there is no contract version change. Navigator should use the new file.
+2. **Extra Skill file `language-basics.md`** with no examples (comments, strings, continuation, case). Real teams document these once, and WP-09 needs them to choose masking fields. It is listed in `sourceSkills`.
+3. **Beyond the plan's record:** role-keyed captures, one rule type per example, and loader error/partial-load behaviour. These are specified in D15 and `src/examples/README.md`.
+4. **The sample repository has one false positive (S2) and one miss (S3) on purpose** for the fixture Rule Set, so the review flow has a real finding. WP-05/07 should not "fix" them in the fixture.
+
+**Open questions**
+- **Review examples vs. plan §8 (needs owner decision).** `reviews.yaml` stores repository-sample snippets as example code (D9), but plan §8 says no repository-sample file is ever sent to the model. If WP-09 puts review examples into prompts, sample code reaches the provider. Proposal: WP-09 uses `source.kind === 'review'` examples only in the runner, never in prompts (written in `src/examples/README.md` §4). Please confirm at G1.
+- **Negatives must contain no match of any construct** (a consequence of plan §8 step 4 and §6.2). The toylang examples obey this, but it rules out "look-alike" negatives that contain another construct (e.g. a `CALL WRITE_LOG()` line as a `db-write` negative). If the owner wants such negatives, the runner would have to apply cross-construct negatives only to rules of other types, or check only the rule under test. That is WP-05's semantics, not a format change.
+- **`tests.passed` in the fixture** counts the construct's own examples (9–10). If WP-05 also counts cross-construct negatives, the fixture numbers must be updated. They are informational and not validated.
+- **How a construct's rule type is known.** It is inferred from the positive examples' `expected[].type`. Skill files carry no explicit construct → rule type field. WP-06's `ruleTypeHint` can use `exampleRuleType`.
+- **Real language, for WP-00:** whether review snippets should be one line or more, and whether example ids from the real team follow kebab-case. The loaders reject other id styles today.

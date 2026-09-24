@@ -1,0 +1,6 @@
+# A second READ in the trailing comment is not a read.
+polarity: positive
+expected:
+  - line: 1
+    type: db_read
+    captures: { table: invoices }

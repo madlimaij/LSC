@@ -1,0 +1,9 @@
+# Argument list continued with &; a procedure whose name contains CALL.
+polarity: positive
+expected:
+  - line: 1
+    type: call
+    captures: { callee: net_price }
+  - line: 3
+    type: call
+    captures: { callee: RECALL_orders }

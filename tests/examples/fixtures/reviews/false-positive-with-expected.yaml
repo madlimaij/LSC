@@ -1,0 +1,14 @@
+reviews:
+  - id: review-db-read-001
+    construct: db-read
+    ruleId: db-read
+    verdict: false_positive
+    sampleFile: orders/order_lines.tl
+    sampleLine: 4
+    code: |
+      READ &
+          order_lines WHERE order_id = oid
+    expected:
+      - line: 1
+        type: db_read
+        captures: { table: order_lines }

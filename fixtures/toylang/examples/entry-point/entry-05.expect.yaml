@@ -1,0 +1,6 @@
+# Target in another module; the reported name is the job name.
+polarity: positive
+expected:
+  - line: 1
+    type: entry_point
+    captures: { name: eod_orders }

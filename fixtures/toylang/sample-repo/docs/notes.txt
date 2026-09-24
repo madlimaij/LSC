@@ -1,0 +1,5 @@
+Design notes (not toylang, not scanned).
+
+MODULE billing will be split into billing and rates.
+PROC calc_total should CALL apply_discount only when FLAG("new_pricing") is on.
+READ orders / WRITE invoices remain unchanged.

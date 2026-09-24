@@ -1,0 +1,6 @@
+# Tabs and extra spaces around the name, trailing line comment.
+polarity: positive
+expected:
+  - line: 1
+    type: module_declaration
+    captures: { name: reporting }

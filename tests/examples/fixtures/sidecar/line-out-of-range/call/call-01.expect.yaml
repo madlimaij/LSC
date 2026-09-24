@@ -1,0 +1,5 @@
+polarity: positive
+expected:
+  - line: 3
+    type: call
+    captures: { callee: apply_discount }

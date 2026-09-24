@@ -1,0 +1,6 @@
+# The path contains "--" inside the string; it is not a comment.
+polarity: positive
+expected:
+  - line: 1
+    type: include
+    captures: { target: "legacy--compat.tl" }

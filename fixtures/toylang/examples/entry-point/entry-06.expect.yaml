@@ -1,0 +1,6 @@
+# Tabs everywhere.
+polarity: positive
+expected:
+  - line: 1
+    type: entry_point
+    captures: { name: weekly_report }

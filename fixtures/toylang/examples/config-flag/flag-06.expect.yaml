@@ -1,0 +1,6 @@
+# A lookup in the trailing comment does not count.
+polarity: positive
+expected:
+  - line: 1
+    type: config_ref
+    captures: { key: audit }

@@ -1,0 +1,6 @@
+# MODULE inside a string on line 3 is text, not a second declaration.
+polarity: positive
+expected:
+  - line: 2
+    type: module_declaration
+    captures: { name: customers }

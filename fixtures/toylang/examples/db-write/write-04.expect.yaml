@@ -1,0 +1,9 @@
+# Two writes in a procedure; the READ is not a write.
+polarity: positive
+expected:
+  - line: 3
+    type: db_write
+    captures: { table: orders }
+  - line: 4
+    type: db_write
+    captures: { table: audit_log }

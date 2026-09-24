@@ -1,0 +1,11 @@
+reviews:
+  - id: review-call-001
+    construct: call
+    ruleId: call-statement
+    verdict: false_positive
+    sampleFile: orders/dispatch.tl
+    sampleLine: 7
+    code: |
+      CALL DYNAMIC handler_name(order_id)
+    reviewedAt: yesterday
+    note: target is only known at run time

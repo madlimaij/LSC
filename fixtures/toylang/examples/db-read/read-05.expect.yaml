@@ -1,0 +1,9 @@
+# Reads inside nested IF blocks in a procedure.
+polarity: positive
+expected:
+  - line: 3
+    type: db_read
+    captures: { table: customers }
+  - line: 5
+    type: db_read
+    captures: { table: vip_benefits }

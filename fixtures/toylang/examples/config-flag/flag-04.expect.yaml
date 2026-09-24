@@ -1,0 +1,9 @@
+# Flag lookups in nested IF conditions.
+polarity: positive
+expected:
+  - line: 2
+    type: config_ref
+    captures: { key: fast_shipping }
+  - line: 3
+    type: config_ref
+    captures: { key: fast_shipping_eu }

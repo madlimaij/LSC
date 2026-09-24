@@ -1,0 +1,4 @@
+polarity: positive
+expected:
+  - line: 1
+    type: [call

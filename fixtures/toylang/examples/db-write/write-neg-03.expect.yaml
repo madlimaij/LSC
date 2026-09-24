@@ -1,0 +1,2 @@
+# A dynamic statement in an EXEC string is not a static write.
+polarity: negative

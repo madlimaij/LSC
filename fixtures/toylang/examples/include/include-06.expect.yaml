@@ -1,0 +1,6 @@
+# A quoted path inside the trailing comment is not a second include.
+polarity: positive
+expected:
+  - line: 1
+    type: include
+    captures: { target: "orders.tl" }

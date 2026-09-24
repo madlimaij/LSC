@@ -56,3 +56,18 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
 - **Decision:** Besides the five rules in WP-02, the validator enforces: `capture-role-not-allowed` (captures may only use the type's required and optional roles), `named-group-syntax` (named groups must be `(?<name>…)`, not `(?P<name>…)`), `exact-tokens` (D11), and `contract-version` (D12). Regex `flags` are limited to `^i?m?s?$`. Each has a failing fixture in `contract/fixtures/invalid/`.
 - **Reason:** A role outside the type's spec has no Navigator meaning. `(?P<name>)` compiles in RE2 but not in JavaScript or most other engines. RE2 silently accepts unknown flags such as `x`, and `g`/`y` would change engine behaviour.
 - **Affects:** WP-09 (model output must satisfy them), Navigator (reimplement or run `lsc validate-ruleset`).
+
+## D15 — Example format details and example source locations
+
+- **Date:** 2026-09-24
+- **Author:** `contract-architect` (WP-03)
+- **Decision:**
+  1. `expected[].captures` is keyed by capture **role** (`callee`, `table`, …), not by group name, and must satisfy `RULE_TYPE_SPEC` (required roles present, no other roles). All expected matches of one example share one rule type. A positive example's actual captures must equal the expected captures exactly (src/examples/README.md §1).
+  2. `Example.source` is a discriminated union `inline` / `sidecar` / `review`; review sources keep `ruleId`, `sampleFile`, `sampleLine` and `verdict`.
+  3. Sidecar examples live in `<language>/examples/<construct>/<id>.<ext>` + `<id>.expect.yaml` (`{ polarity, expected? }`); `reviews.yaml` lives at `<language>/reviews.yaml`, where `<language>/skills/` is the `<skills-dir>` argument (`exampleLocations`).
+  4. `reviews.yaml` is `{ reviews: ReviewEntry[] }`; verdict `correct` → positive (needs `expected`), `false_positive` → negative. `skip` is not written.
+  5. Inline `yaml expect` blocks contain a YAML list of expected matches; negative examples have no block.
+  6. Loaders return `{ examples, errors }` and never throw on bad input; errors are `file:line: path: message`.
+  7. The fixture Rule Set `contract/fixtures/toylang.ruleset.json` was aligned with final toylang (before G1, so no contract change): `call-statement` became a regex (to capture `module`), `module-declaration` and `entry-point` became `exact`, `proc-definition` gained the `kind` capture (`PROC`/`FUNC`), `db-read` became whole-text (`multiline: true`) for reads continued after the keyword, real Skill hashes, anchors and example ids.
+- **Reason:** Plan §6.1 names the record's fields but not these details, and WP-05, WP-06, WP-07 and WP-09 all depend on them. Roles are stable across rule edits; group names are not (same reasoning as D2). One type per example keeps "every expected match is found" (plan §6.2) unambiguous. Plan §8 step 4 runs every rule against every negative example, so negatives must contain no match of any construct; this is documented, not enforceable without engines.
+- **Affects:** WP-05 (pass/fail comparison), WP-06 (inline examples via `parseExpectBlock` + `buildExample`, locations), WP-07 (`stringifyReviews`), WP-09 (see the open question on review examples and the model in the WP-03 completion note).

@@ -1,0 +1,6 @@
+# Tab indentation and several spaces before the path.
+polarity: positive
+expected:
+  - line: 1
+    type: include
+    captures: { target: "shared/constants.tl" }

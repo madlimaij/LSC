@@ -1,0 +1,6 @@
+# Lower-case FUNC with the parameter list continued over two lines with &.
+polarity: positive
+expected:
+  - line: 1
+    type: symbol_definition
+    captures: { name: shipping_cost, kind: func }

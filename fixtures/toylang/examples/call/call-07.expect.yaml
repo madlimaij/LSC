@@ -1,0 +1,6 @@
+# Lower-case cross-module call with INTO.
+polarity: positive
+expected:
+  - line: 2
+    type: call
+    captures: { module: orders, callee: reprocess }

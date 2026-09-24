@@ -1,0 +1,8 @@
+polarity: positive
+expected:
+  - line: 1
+    type: call
+    captures: { callee: a }
+  - line: 2
+    type: db_read
+    captures: { table: orders }
