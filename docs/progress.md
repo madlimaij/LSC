@@ -16,7 +16,7 @@
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
 | WP-12 | Extra engines (conditional) | engine-builder | WP-11 | not started |
 
-Gates: G1 ☐ G2 ☐ G3 ☐ G4 ☐
+Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 
 ## Completion notes
 

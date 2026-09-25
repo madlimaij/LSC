@@ -71,3 +71,20 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
   7. The fixture Rule Set `contract/fixtures/toylang.ruleset.json` was aligned with final toylang (before G1, so no contract change): `call-statement` became a regex (to capture `module`), `module-declaration` and `entry-point` became `exact`, `proc-definition` gained the `kind` capture (`PROC`/`FUNC`), `db-read` became whole-text (`multiline: true`) for reads continued after the keyword, real Skill hashes, anchors and example ids.
 - **Reason:** Plan §6.1 names the record's fields but not these details, and WP-05, WP-06, WP-07 and WP-09 all depend on them. Roles are stable across rule edits; group names are not (same reasoning as D2). One type per example keeps "every expected match is found" (plan §6.2) unambiguous. Plan §8 step 4 runs every rule against every negative example, so negatives must contain no match of any construct; this is documented, not enforceable without engines.
 - **Affects:** WP-05 (pass/fail comparison), WP-06 (inline examples via `parseExpectBlock` + `buildExample`, locations), WP-07 (`stringifyReviews`), WP-09 (see the open question on review examples and the model in the WP-03 completion note).
+
+## D16 — Gate G1: Rule Set contract 1.0.0 approved and frozen
+
+- **Date:** 2026-09-25
+- **Author:** orchestrator, recording the project owner's decision at G1
+- **Decision:** The project owner approved the Rule Set contract 1.0.0 with these decisions as proposed:
+  a. D1 and D6 as planned;
+  b. D10: minimum Node.js 22.22.2;
+  c. D11: exact-engine placeholder tokens `(?<name>)` matching `[0-9A-Za-z_]+`;
+  d. D12: closed objects; 1.0 consumers reject 1.1+ and other majors;
+  e. D13: matching semantics (contract/CONTRACT.md §6) are part of the frozen contract;
+  f. contract/CONTRACT.md §9 Q2–Q7: the proposals in CONTRACT.md stand for 1.0 and are revisited with real inputs at G4;
+  g. examples from `reviews.yaml` (repository-sample text) are used only by the runner and are never sent to a model provider (plan §8);
+  h. negative examples must contain no match of any construct (no look-alike negatives);
+  i. dev dependencies `ajv` and `ajv-formats` added in WP-02 are accepted.
+- **Reason:** Human gate G1 (docs/ORCHESTRATION.md §4).
+- **Affects:** `src/contract/` is frozen; changes need a contract version bump and a DECISIONS entry by `contract-architect`. WP-09 must not put review examples into prompts. WP-05 applies every rule to every negative example.
