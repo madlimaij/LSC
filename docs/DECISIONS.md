@@ -88,3 +88,11 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
   i. dev dependencies `ajv` and `ajv-formats` added in WP-02 are accepted.
 - **Reason:** Human gate G1 (docs/ORCHESTRATION.md §4).
 - **Affects:** `src/contract/` is frozen; changes need a contract version bump and a DECISIONS entry by `contract-architect`. WP-09 must not put review examples into prompts. WP-05 applies every rule to every negative example.
+
+## D17 — Model-layer conventions
+
+- **Date:** 2026-09-25
+- **Author:** `llm-integrator` (WP-08); appended by the orchestrator
+- **Decision:** Recordings are keyed by sha256 of canonical `{system, messages}`, excluding `maxOutputTokens`, provider and model. The API key comes only from the environment variable named in `provider.apiKeyEnv`. Budgets refuse and never shrink requests. `structured()` accepts only a whole-text JSON document or exactly one `json` or unlabelled fence. Infrastructure errors are thrown; output errors are returned as failed attempts. Malformed requests are not logged; refused and failed requests are.
+- **Reason:** Stable recordings across budget changes; no secrets in files; no silent fallback (plan §8, D7).
+- **Affects:** WP-09; adding a provider at G4.

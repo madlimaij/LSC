@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "hash": "a0c0d1f2fbf9a14614c7cc178453c84cd35f600cbe1eb16322edde8dc93195c5",
+  "origin": "hand-written",
+  "provider": "hand-written",
+  "model": "hand-written",
+  "recordedAt": "2026-09-25T00:00:00.000Z",
+  "note": "WP-08 validBare: valid rule as a bare JSON document",
+  "request": {
+    "system": "You write deterministic detection rules for the language toylang. Answer with one JSON object and nothing else.",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Construct: include\nPropose rules as {\"rules\": [{\"id\": string, \"engine\": \"regex\", \"pattern\": string}], \"notJustified\"?: string}.\nPositive example:\nINCLUDE \"common/util.tl\""
+      }
+    ],
+    "maxOutputTokens": 512
+  },
+  "response": {
+    "text": "{\"rules\": [{\"id\": \"include-statement\", \"engine\": \"regex\", \"pattern\": \"(?i)^\\\\s*INCLUDE\\\\s+\\\"(?<target>[^\\\"]+)\\\"\"}]}",
+    "usage": {
+      "inputTokens": 400,
+      "outputTokens": 150
+    },
+    "stopReason": "end",
+    "rawStopReason": "end_turn"
+  }
+}

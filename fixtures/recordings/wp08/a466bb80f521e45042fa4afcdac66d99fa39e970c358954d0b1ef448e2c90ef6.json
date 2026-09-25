@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "hash": "a466bb80f521e45042fa4afcdac66d99fa39e970c358954d0b1ef448e2c90ef6",
+  "origin": "hand-written",
+  "provider": "hand-written",
+  "model": "hand-written",
+  "recordedAt": "2026-09-25T00:00:00.000Z",
+  "note": "WP-08 notJustified: model declines: no rules plus a reason",
+  "request": {
+    "system": "You write deterministic detection rules for the language toylang. Answer with one JSON object and nothing else.",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Construct: proc-definition\nPropose rules as {\"rules\": [{\"id\": string, \"engine\": \"regex\", \"pattern\": string}], \"notJustified\"?: string}.\nPositive example:\nPROC apply_discount(order_id)"
+      }
+    ],
+    "maxOutputTokens": 512
+  },
+  "response": {
+    "text": "{\"rules\": [], \"notJustified\": \"One example is not enough to tell PROC from FUNC headers.\"}",
+    "usage": {
+      "inputTokens": 400,
+      "outputTokens": 30
+    },
+    "stopReason": "end",
+    "rawStopReason": "end_turn"
+  }
+}

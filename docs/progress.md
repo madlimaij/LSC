@@ -10,7 +10,7 @@
 | WP-05 | Test runner | engine-builder | WP-04 | not started |
 | WP-06 | Skill ingestion | skill-ingester | WP-03 | in progress |
 | WP-07 | Report + review CLI | report-builder | WP-05 | not started |
-| WP-08 | Model provider layer | llm-integrator | WP-02 | in progress |
+| WP-08 | Model provider layer | llm-integrator | WP-02 | done (repo-wide checks pending WP-04; awaiting wave 2 review) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | not started |
 | WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | not started |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
@@ -146,3 +146,20 @@ Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 
 **Open questions**
 - None for the contract. Navigator should take the new `contract/fixtures/invalid/` files together with the current valid fixture. The file names are unchanged.
+
+### WP-08: Model provider layer (`llm-integrator`, 2026-09-25)
+
+*(Appended by the orchestrator from the agent's final message; parallel wave.)*
+
+**What was built:** `src/llm/` — `types.ts` (`LlmProvider`), `errors.ts` (typed errors), `request.ts` (request schema, `requestHash`), `config.ts` (`lsc.config.json` schema, `loadConfig`), `budget.ts` (`TokenBudget`), `snippet-log.ts` (per-run JSONL log), `guarded.ts` (`GuardedProvider`: validate → budget → call → log), `anthropic.ts` (`AnthropicProvider`, injectable client factory), `fake.ts` (`FakeProvider`), `recordings.ts` (recording format), `recording-provider.ts`, `structured.ts` (`structured`, `parseStructured`, `extractJson`), `factory.ts` (`createProvider`, `createSession`), `index.ts`, `README.md`. `fixtures/recordings/wp08/` (8 hand-written toylang recordings) and `fixtures/recordings/README.md`. Tests in `tests/llm/` (8 files, 69 tests).
+
+**Acceptance criteria**
+- All tests use `FakeProvider`; constructing the Anthropic client under `npm test` fails — **met** (`anthropic.test.ts › constructing the real Anthropic client during npm test throws`; `› only src/llm/anthropic.ts imports the Anthropic SDK`).
+- Budget exhaustion tested — **met** (`budget.test.ts › stops the run with a clear error when the per-compile budget is exceeded`, `› throws after a call whose actual usage pushes the run over the cap`, `› refuses a request above the per-call output cap without sending it`).
+- Invalid JSON tested — **met** (`structured.test.ts › invalid JSON is a typed error, not a repaired value`, plus `no_json`, `schema`, `truncated`, `ambiguous_json`, `stopped`).
+- Every request appears in the snippet log — **met** (`snippet-log.test.ts › records every request of a run, including failed and refused ones, with full text and usage`).
+- typecheck/lint/test — `npm run typecheck` clean; `eslint src/llm tests/llm` clean; `vitest run tests/llm` 69/69. Repo-wide lint/test failures at hand-back were all in WP-04's in-progress files; to be re-run when WP-04 lands.
+
+**Deviations:** (1) API key only from the env var named in `provider.apiKeyEnv`; a key in the file is rejected; `provider.model` required. (2) Recording hash covers `system` + `messages` only (not `maxOutputTokens`, provider, model). (3) Budgets refuse, never shrink; pre-call check `used + maxOutputTokens ≤ total`, post-call overrun is logged then throws. (4) WP-08 recordings are hand-written (`origin: "hand-written"`); real toylang recording belongs to WP-09. (5) Malformed requests are not logged (never sent); refused and failed calls are. (6) `structured()` throws on infrastructure errors; accepts only whole-text JSON or exactly one `json`/unlabelled fence, no repair.
+
+**Open questions:** (a) Should `lsc compile` refuse recording mode when `LSC_REAL_INPUTS` is set or inputs are outside `fixtures/toylang`? (b) Should `provider.baseUrl` be mandatory so the endpoint is explicit for the G4 policy check (SDK otherwise falls back to `ANTHROPIC_BASE_URL`)? (c) Should the snippet log keep `responseText`, or only what was sent? No new dependencies needed.

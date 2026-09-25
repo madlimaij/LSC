@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "hash": "6a9fb9bf1b18dcb6249c293cebd365c717fe9de458d14b07d5e4174f0f64487f",
+  "origin": "hand-written",
+  "provider": "hand-written",
+  "model": "hand-written",
+  "recordedAt": "2026-09-25T00:00:00.000Z",
+  "note": "WP-08 truncated: answer cut off at maxOutputTokens",
+  "request": {
+    "system": "You write deterministic detection rules for the language toylang. Answer with one JSON object and nothing else.",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Construct: module-declaration\nPropose rules as {\"rules\": [{\"id\": string, \"engine\": \"regex\", \"pattern\": string}], \"notJustified\"?: string}.\nPositive example:\nMODULE billing"
+      }
+    ],
+    "maxOutputTokens": 512
+  },
+  "response": {
+    "text": "{\"rules\": [{\"id\": \"module-declaration\", \"engine\": \"regex\", \"pattern\": \"(?i)^\\\\s*MODULE",
+    "usage": {
+      "inputTokens": 400,
+      "outputTokens": 512
+    },
+    "stopReason": "max_tokens",
+    "rawStopReason": "max_tokens"
+  }
+}

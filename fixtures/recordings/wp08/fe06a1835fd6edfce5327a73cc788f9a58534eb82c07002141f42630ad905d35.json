@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "hash": "fe06a1835fd6edfce5327a73cc788f9a58534eb82c07002141f42630ad905d35",
+  "origin": "hand-written",
+  "provider": "hand-written",
+  "model": "hand-written",
+  "recordedAt": "2026-09-25T00:00:00.000Z",
+  "note": "WP-08 invalidJson: JavaScript object literal, not JSON: unquoted keys, single quotes, trailing comma",
+  "request": {
+    "system": "You write deterministic detection rules for the language toylang. Answer with one JSON object and nothing else.",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Construct: db-read\nPropose rules as {\"rules\": [{\"id\": string, \"engine\": \"regex\", \"pattern\": string}], \"notJustified\"?: string}.\nPositive example:\nREAD customers WHERE id = cid INTO cust"
+      }
+    ],
+    "maxOutputTokens": 512
+  },
+  "response": {
+    "text": "{rules: [{id: 'db-read', engine: 'regex', pattern: 'READ\\\\s+(?<table>\\\\w+)'},]}",
+    "usage": {
+      "inputTokens": 410,
+      "outputTokens": 60
+    },
+    "stopReason": "end",
+    "rawStopReason": "end_turn"
+  }
+}

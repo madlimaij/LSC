@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "hash": "6d309bf675d79c792b75b80f4acc8cef98373cc4c5465be08e9f6d7203d56d4a",
+  "origin": "hand-written",
+  "provider": "hand-written",
+  "model": "hand-written",
+  "recordedAt": "2026-09-25T00:00:00.000Z",
+  "note": "WP-08 validFenced: valid rule inside a ```json fence with surrounding prose",
+  "request": {
+    "system": "You write deterministic detection rules for the language toylang. Answer with one JSON object and nothing else.",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Construct: call\nPropose rules as {\"rules\": [{\"id\": string, \"engine\": \"regex\", \"pattern\": string}], \"notJustified\"?: string}.\nPositive example:\nCALL apply_discount(order_id)"
+      }
+    ],
+    "maxOutputTokens": 512
+  },
+  "response": {
+    "text": "Here is the rule:\n```json\n{\"rules\": [{\"id\": \"call-statement\", \"engine\": \"regex\", \"pattern\": \"(?i)\\\\bCALL\\\\s+(?<callee>[A-Za-z_][A-Za-z0-9_]*)\\\\s*\\\\(\"}]}\n```\n",
+    "usage": {
+      "inputTokens": 420,
+      "outputTokens": 180
+    },
+    "stopReason": "end",
+    "rawStopReason": "end_turn"
+  }
+}

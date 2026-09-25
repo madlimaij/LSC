@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "hash": "4f7d3f77542e68b06df6c825717d33b344906fd1cd3c94ccca080975c9778909",
+  "origin": "hand-written",
+  "provider": "hand-written",
+  "model": "hand-written",
+  "recordedAt": "2026-09-25T00:00:00.000Z",
+  "note": "WP-08 twoBlocks: two fenced JSON blocks; structured() must not pick one",
+  "request": {
+    "system": "You write deterministic detection rules for the language toylang. Answer with one JSON object and nothing else.",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Construct: entry-point\nPropose rules as {\"rules\": [{\"id\": string, \"engine\": \"regex\", \"pattern\": string}], \"notJustified\"?: string}.\nPositive example:\nENTRY nightly_billing -> calc_total"
+      }
+    ],
+    "maxOutputTokens": 512
+  },
+  "response": {
+    "text": "Option A:\n```json\n{\"rules\": []}\n```\nOption B:\n```json\n{\"rules\": [{\"id\": \"entry\", \"engine\": \"regex\", \"pattern\": \"ENTRY\"}]}\n```\n",
+    "usage": {
+      "inputTokens": 400,
+      "outputTokens": 70
+    },
+    "stopReason": "end",
+    "rawStopReason": "end_turn"
+  }
+}

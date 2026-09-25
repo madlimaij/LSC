@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "hash": "f0273063966968433cad63ff27a8ac0611b68562eded6eb7d5a717423b4a9f12",
+  "origin": "hand-written",
+  "provider": "hand-written",
+  "model": "hand-written",
+  "recordedAt": "2026-09-25T00:00:00.000Z",
+  "note": "WP-08 proseOnly: prose without any JSON",
+  "request": {
+    "system": "You write deterministic detection rules for the language toylang. Answer with one JSON object and nothing else.",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Construct: db-write\nPropose rules as {\"rules\": [{\"id\": string, \"engine\": \"regex\", \"pattern\": string}], \"notJustified\"?: string}.\nPositive example:\nWRITE orders SET status = \"paid\" WHERE id = oid"
+      }
+    ],
+    "maxOutputTokens": 512
+  },
+  "response": {
+    "text": "A WRITE statement starts with WRITE followed by the table name, so a regex on WRITE should work.",
+    "usage": {
+      "inputTokens": 405,
+      "outputTokens": 40
+    },
+    "stopReason": "end",
+    "rawStopReason": "end_turn"
+  }
+}

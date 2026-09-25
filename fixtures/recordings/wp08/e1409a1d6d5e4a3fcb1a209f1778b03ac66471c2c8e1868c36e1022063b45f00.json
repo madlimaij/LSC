@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "hash": "e1409a1d6d5e4a3fcb1a209f1778b03ac66471c2c8e1868c36e1022063b45f00",
+  "origin": "hand-written",
+  "provider": "hand-written",
+  "model": "hand-written",
+  "recordedAt": "2026-09-25T00:00:00.000Z",
+  "note": "WP-08 schemaMismatch: valid JSON that misses the required \"engine\" field and uses a numeric id",
+  "request": {
+    "system": "You write deterministic detection rules for the language toylang. Answer with one JSON object and nothing else.",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Construct: config-flag\nPropose rules as {\"rules\": [{\"id\": string, \"engine\": \"regex\", \"pattern\": string}], \"notJustified\"?: string}.\nPositive example:\nIF FLAG(\"new_pricing\") THEN"
+      }
+    ],
+    "maxOutputTokens": 512
+  },
+  "response": {
+    "text": "{\"rules\": [{\"id\": 7, \"pattern\": \"FLAG\\\\(\\\"(?<key>[^\\\"]+)\\\"\\\\)\"}]}",
+    "usage": {
+      "inputTokens": 400,
+      "outputTokens": 50
+    },
+    "stopReason": "end",
+    "rawStopReason": "end_turn"
+  }
+}
