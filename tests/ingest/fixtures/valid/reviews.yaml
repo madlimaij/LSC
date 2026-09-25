@@ -1,0 +1,13 @@
+reviews:
+  - id: review-say-001
+    construct: say
+    ruleId: say-statement
+    verdict: correct
+    sampleFile: admin/audit.tl
+    sampleLine: 3
+    code: |
+      SAY "reviewed"
+    expected:
+      - line: 1
+        type: call
+        captures: { callee: reviewed }

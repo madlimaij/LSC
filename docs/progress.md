@@ -8,7 +8,7 @@
 | WP-03 | Example format + toylang | contract-architect | WP-02 | done (reviewed wave 1) |
 | WP-04 | Rule engines | engine-builder | WP-02, WP-03 | in progress |
 | WP-05 | Test runner | engine-builder | WP-04 | not started |
-| WP-06 | Skill ingestion | skill-ingester | WP-03 | in progress |
+| WP-06 | Skill ingestion | skill-ingester | WP-03 | done (repo-wide checks pending WP-04; awaiting wave 2 review) |
 | WP-07 | Report + review CLI | report-builder | WP-05 | not started |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (repo-wide checks pending WP-04; awaiting wave 2 review) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | not started |
@@ -163,3 +163,19 @@ Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 **Deviations:** (1) API key only from the env var named in `provider.apiKeyEnv`; a key in the file is rejected; `provider.model` required. (2) Recording hash covers `system` + `messages` only (not `maxOutputTokens`, provider, model). (3) Budgets refuse, never shrink; pre-call check `used + maxOutputTokens ≤ total`, post-call overrun is logged then throws. (4) WP-08 recordings are hand-written (`origin: "hand-written"`); real toylang recording belongs to WP-09. (5) Malformed requests are not logged (never sent); refused and failed calls are. (6) `structured()` throws on infrastructure errors; accepts only whole-text JSON or exactly one `json`/unlabelled fence, no repair.
 
 **Open questions:** (a) Should `lsc compile` refuse recording mode when `LSC_REAL_INPUTS` is set or inputs are outside `fixtures/toylang`? (b) Should `provider.baseUrl` be mandatory so the endpoint is explicit for the G4 policy check (SDK otherwise falls back to `ANTHROPIC_BASE_URL`)? (c) Should the snippet log keep `responseText`, or only what was sent? No new dependencies needed.
+
+### WP-06: Skill ingestion (`skill-ingester`, 2026-09-25)
+
+*(Appended by the orchestrator from the agent's final message; parallel wave.)*
+
+**What was built:** `src/ingest/` — `markdown.ts` (unified + remark-parse wrapper; no regex over Markdown), `slug.ts` (`slugify`, `SlugCounter`), `info-string.ts` (`parseInfoString`), `hash.ts` (`sha256Hex`), `inline.ts` (`extractInline`), `construct.ts` (`Construct`, `sectionText`, `truncateProse`, `ruleTypeHintOf`, `compareConstructs`), `diagnostics.ts` (re-exports the `src/examples` error shape), `ingest.ts` (`ingestSkills`: discover, hash, merge inline + sidecar + `reviews.yaml` by construct, cross-source id dedup), `index.ts`, `README.md`. `src/cli/commands/ingest.ts` (`lsc ingest <skills-dir> [--json] [--prose-limit <chars>]`). Tests in `tests/ingest/` (5 files, 39 tests) with 8 fixture directories.
+
+**Acceptance criteria**
+- All toylang Skill files ingest with zero errors and expected counts — **met** (`ingest.test.ts › ingestSkills: toylang (acceptance criterion 1)`: 0 diagnostics, 9 files hashed, 8 constructs with the plan §5.3 `ruleTypeHint`, ≥5 positive / ≥2 negative each).
+- Each diagnostic has a triggering fixture — **met** (`ingest.test.ts › diagnostics have a triggering fixture each`, 7 fixtures, exact text and line asserted).
+- Changing one character changes the hash and nothing else — **met** (`ingest.test.ts › ingestSkills: hashing`).
+- typecheck/lint/test — clean on all WP-06 files (`eslint src/ingest tests/ingest src/cli/commands/ingest.ts` clean, `vitest run tests/ingest` 39/39, orchestrator re-ran). Repo-wide typecheck errors at hand-back were only in WP-04's in-progress `src/engines/masking.ts`.
+
+**Deviations:** (1) Sub-headings such as `### Traps` are folded into the parent construct's section (prose and anchor). (2) Extra diagnostic: positive examples disagree on rule type. (3) `lsc ingest` adds `--json` and `--prose-limit`.
+
+**Open questions:** Proposed DECISIONS entry recorded as D18. No new dependencies.

@@ -96,3 +96,11 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
 - **Decision:** Recordings are keyed by sha256 of canonical `{system, messages}`, excluding `maxOutputTokens`, provider and model. The API key comes only from the environment variable named in `provider.apiKeyEnv`. Budgets refuse and never shrink requests. `structured()` accepts only a whole-text JSON document or exactly one `json` or unlabelled fence. Infrastructure errors are thrown; output errors are returned as failed attempts. Malformed requests are not logged; refused and failed requests are.
 - **Reason:** Stable recordings across budget changes; no secrets in files; no silent fallback (plan §8, D7).
 - **Affects:** WP-09; adding a provider at G4.
+
+## D18 — Construct anchors and orphan examples
+
+- **Date:** 2026-09-25
+- **Author:** `skill-ingester` (WP-06); appended by the orchestrator
+- **Decision:** A construct's anchor is the heading enclosing the first inline example (document order) that declares it; nested sub-headings (e.g. `### Traps`) belong to the parent construct's section. Sidecar or `reviews.yaml` examples for a construct that no Skill file documents are dropped with an "example without construct" diagnostic rather than becoming a construct of their own.
+- **Reason:** WP-09 needs one stable anchor per construct, and every example must be traceable to documentation, not only to a directory name.
+- **Affects:** WP-09 (anchors in `sourceEvidence`), WP-00 (real Skill files must document every construct that has examples).
