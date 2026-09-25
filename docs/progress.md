@@ -6,11 +6,11 @@
 | WP-01 | Skeleton and tooling | contract-architect | — | done (reviewed wave 1) |
 | WP-02 | Rule Set contract | contract-architect | WP-01 | done (reviewed wave 1) |
 | WP-03 | Example format + toylang | contract-architect | WP-02 | done (reviewed wave 1) |
-| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | not started |
+| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | in progress |
 | WP-05 | Test runner | engine-builder | WP-04 | not started |
-| WP-06 | Skill ingestion | skill-ingester | WP-03 | not started |
+| WP-06 | Skill ingestion | skill-ingester | WP-03 | in progress |
 | WP-07 | Report + review CLI | report-builder | WP-05 | not started |
-| WP-08 | Model provider layer | llm-integrator | WP-02 | not started |
+| WP-08 | Model provider layer | llm-integrator | WP-02 | in progress |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | not started |
 | WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | not started |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
@@ -123,3 +123,26 @@ Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 - **`tests.passed` in the fixture** counts the construct's own examples (9–10). If WP-05 also counts cross-construct negatives, the fixture numbers must be updated. They are informational and not validated.
 - **How a construct's rule type is known.** It is inferred from the positive examples' `expected[].type`. Skill files carry no explicit construct → rule type field. WP-06's `ruleTypeHint` can use `exampleRuleType`.
 - **Real language, for WP-00:** whether review snippets should be one line or more, and whether example ids from the real team follow kebab-case. The loaders reject other id styles today.
+
+### WP-02 follow-up: invalid fixtures re-derived (`contract-architect`, 2026-09-25)
+
+**What was built**
+- `contract/fixtures/invalid/*.json` (all 23 files): re-derived from the current `contract/fixtures/toylang.ruleset.json` (the WP-03 version). Each file is the valid fixture with one mutation, serialized with 2-space JSON like the valid fixture. File names, rule coverage and the rule each file breaks are unchanged.
+- `tests/contract/helpers.ts`: `differingPaths(a, b)` lists the JSON Pointer paths where two JSON values differ. Objects, and arrays that contain objects, are compared member by member. Scalars and arrays of scalars (e.g. `exact.tokens`) count as one place. An added or removed member counts as one place.
+- `tests/contract/fixtures.test.ts`: new test "`<file>` differs from the current valid fixture in exactly one place". It runs for every invalid fixture, the structural `schema--`/`contract-version--` ones included, because all of them can be made single-place. There is also a unit test for `differingPaths`. The comment at the old line 58 now points to this test.
+- No change to `src/contract/`, `contract/rule-set.schema.json`, `contract/CONTRACT.md` or `contractVersion` (still 1.0.0).
+
+**Acceptance criteria**
+- Every invalid fixture differs from the current valid fixture in exactly one place — **met**. `fixtures.test.ts` › "%s differs from the current valid fixture in exactly one place" (23 cases pass). Against the WP-02 valid fixture the same comparison gives up to 76 differing paths per file, so the test would have caught the drift.
+- Each fixture still fails only for the rule named in its file name — **met**. `fixtures.test.ts` › "%s fails only for the rule named in its file name" (cross-field ones: exactly one issue). `json-schema.test.ts` still shows structural fixtures rejected and cross-field fixtures accepted by the exported JSON Schema.
+- CLI tests that name specific fixtures still hold: `$.rules[2].captures` for `captures-required-roles--call-without-callee.json` and `$.rules[5].id` for `duplicate-rule-id--two-rules-same-id.json` (`validate-ruleset-cli.test.ts`).
+- `npm run typecheck`, `npm run lint`, `npm test` — **met**. All clean; `Test Files 14 passed (14), Tests 228 passed (228)`.
+
+**Deviations from the brief and why**
+- Some mutations had to target different rules or use a different single edit, because WP-03 changed the rules in the valid fixture:
+  - `call-statement` is now `regex`, so the exact-engine cases moved. `capture-group-missing--exact-placeholder` now targets `entry-point` (rules[7]). `exact-tokens--*` and `schema--exact-token-with-space` now target `module-declaration` (rules[0]).
+  - Two old fixtures made a two-place edit and now make a one-place edit that breaks the same rule. `schema--engine-config-mismatch` changes `engine` to `exact` on `db-read` instead of swapping the config blocks. `schema--unknown-field` adds a misspelled `blockend` key next to `blockEnd` instead of renaming the key.
+- Every JSON file was rewritten in full, so the git diff shows whole-file churn even though each file's content differs from the valid fixture in one place only.
+
+**Open questions**
+- None for the contract. Navigator should take the new `contract/fixtures/invalid/` files together with the current valid fixture. The file names are unchanged.

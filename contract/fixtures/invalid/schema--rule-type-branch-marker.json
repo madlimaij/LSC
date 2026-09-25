@@ -6,36 +6,40 @@
   "compilerVersion": "0.1.0",
   "sourceSkills": [
     {
+      "path": "skills/language-basics.md",
+      "sha256": "d96e4e99404e5bcea7dfc580dd5ca36aea4c38fe3b09fe4fe973ec77fe55b469"
+    },
+    {
       "path": "skills/module.md",
-      "sha256": "39602dba195534b7e2e07d2773825b8e119c023616953f48a1dc275a743462e9"
+      "sha256": "8726ba9efff6553b38536488a6b94ade71cdcec50ed76506de9550e49b04d426"
     },
     {
       "path": "skills/procedure.md",
-      "sha256": "d150d2591c812bb59969fdca764d03c3909da4fbb5b1c7090e321b753ce1f273"
+      "sha256": "55994bb01a2f5dfc6d74d3846a958958ae55de8eebee4175106715047dcf7411"
     },
     {
       "path": "skills/call.md",
-      "sha256": "7fce3acb601fbd0408f6124f17a9740757fb5895186db53b3493b9725c98d145"
+      "sha256": "b2e134f5075a6ef524d9d9924da4082b5b31ca3980a807141840dbb1369e91bd"
     },
     {
       "path": "skills/include.md",
-      "sha256": "ffe09f36a2f4665166c0cd4217a2c5b254b45615ab2beb4934c6a99d5c236bf6"
+      "sha256": "c2ffba25e7c1daf670b60c9a6b2a3474618da0d8467c0b2ec3e8dcdcf7317011"
     },
     {
       "path": "skills/db-read.md",
-      "sha256": "c79a5993dd5485ef9818bab85f7853ef934c7cf8855e5030cfb138a2754bfeed"
+      "sha256": "51ee4a22f0c1f80c03bac0412ad260cdab4c60ae6e6262a5e03bf88394e65971"
     },
     {
       "path": "skills/db-write.md",
-      "sha256": "df0324ff75b248ccffbceddba7b6a4dd15252d15ecdbe48eff2a7cd4140d7382"
+      "sha256": "45a60588788bbce069eb6b24566f5a7828749d7ff4aa16f24f0a8318d4b5a3fe"
     },
     {
       "path": "skills/config-flag.md",
-      "sha256": "0bacd2a7c96a49fafcc331033d5e3d589b7c6ce037b8b18599a02955ed987b82"
+      "sha256": "ea9696b64b82100786b84303cddf86cf1ead527c13d85c9ae8153c7b84ffc6c9"
     },
     {
       "path": "skills/entry-point.md",
-      "sha256": "9a7a5888eea38cf983fcd2491c8359087c9020d958b58adfa58b9d97e626876d"
+      "sha256": "1f3d265af107947941089481aa3fec7d9c115e3857e99ef7dc4b4a9ef588140c"
     }
   ],
   "fileMatchers": [
@@ -56,11 +60,13 @@
     {
       "id": "module-declaration",
       "type": "module_declaration",
-      "engine": "regex",
-      "regex": {
-        "pattern": "^\\s*MODULE\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)",
-        "flags": "i",
-        "multiline": false
+      "engine": "exact",
+      "exact": {
+        "tokens": [
+          "MODULE",
+          "(?<name>)"
+        ],
+        "caseSensitive": false
       },
       "captures": {
         "name": "name"
@@ -69,20 +75,22 @@
       "sourceEvidence": [
         {
           "skill": "skills/module.md",
-          "anchor": "module-declaration",
+          "anchor": "declaring-a-module",
           "exampleIds": [
             "module-01",
             "module-02",
             "module-03",
             "module-04",
             "module-05",
+            "module-06",
             "module-neg-01",
-            "module-neg-02"
+            "module-neg-02",
+            "module-neg-03"
           ]
         }
       ],
       "tests": {
-        "passed": 7,
+        "passed": 9,
         "failed": 0,
         "failingExampleIds": []
       },
@@ -93,15 +101,16 @@
       "type": "symbol_definition",
       "engine": "regex",
       "regex": {
-        "pattern": "^\\s*PROC\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)",
+        "pattern": "^\\s*(?<kind>PROC|FUNC)\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)",
         "flags": "i",
         "multiline": false
       },
       "captures": {
-        "name": "name"
+        "name": "name",
+        "kind": "kind"
       },
       "blockEnd": {
-        "pattern": "^\\s*ENDPROC\\b",
+        "pattern": "^\\s*END(?:PROC|FUNC)\\b",
         "flags": "i",
         "multiline": false
       },
@@ -116,13 +125,15 @@
             "proc-03",
             "proc-04",
             "proc-05",
+            "proc-06",
             "proc-neg-01",
-            "proc-neg-02"
+            "proc-neg-02",
+            "proc-neg-03"
           ]
         }
       ],
       "tests": {
-        "passed": 7,
+        "passed": 9,
         "failed": 0,
         "failingExampleIds": []
       },
@@ -131,16 +142,15 @@
     {
       "id": "call-statement",
       "type": "branch_marker",
-      "engine": "exact",
-      "exact": {
-        "tokens": [
-          "CALL",
-          "(?<callee>)"
-        ],
-        "caseSensitive": false
+      "engine": "regex",
+      "regex": {
+        "pattern": "\\bCALL\\s+(?:(?<module>[A-Za-z_][A-Za-z0-9_]*)\\.)?(?<callee>[A-Za-z_][A-Za-z0-9_]*)\\s*\\(",
+        "flags": "i",
+        "multiline": false
       },
       "captures": {
-        "callee": "callee"
+        "callee": "callee",
+        "module": "module"
       },
       "confidence": "high",
       "sourceEvidence": [
@@ -153,13 +163,16 @@
             "call-03",
             "call-04",
             "call-05",
+            "call-06",
+            "call-07",
             "call-neg-01",
-            "call-neg-02"
+            "call-neg-02",
+            "call-neg-03"
           ]
         }
       ],
       "tests": {
-        "passed": 7,
+        "passed": 10,
         "failed": 0,
         "failingExampleIds": []
       },
@@ -189,13 +202,15 @@
             "include-03",
             "include-04",
             "include-05",
+            "include-06",
             "include-neg-01",
-            "include-neg-02"
+            "include-neg-02",
+            "include-neg-03"
           ]
         }
       ],
       "tests": {
-        "passed": 7,
+        "passed": 9,
         "failed": 0,
         "failingExampleIds": []
       },
@@ -206,9 +221,9 @@
       "type": "db_read",
       "engine": "regex",
       "regex": {
-        "pattern": "\\bREAD\\s+(?<table>[A-Za-z_][A-Za-z0-9_]*)",
+        "pattern": "\\bREAD\\s+(?:&\\s+)?(?<table>[A-Za-z_][A-Za-z0-9_]*)",
         "flags": "i",
-        "multiline": false
+        "multiline": true
       },
       "captures": {
         "table": "table"
@@ -224,13 +239,16 @@
             "read-03",
             "read-04",
             "read-05",
+            "read-06",
+            "read-07",
             "read-neg-01",
-            "read-neg-02"
+            "read-neg-02",
+            "read-neg-03"
           ]
         }
       ],
       "tests": {
-        "passed": 7,
+        "passed": 10,
         "failed": 0,
         "failingExampleIds": []
       },
@@ -259,13 +277,15 @@
             "write-03",
             "write-04",
             "write-05",
+            "write-06",
             "write-neg-01",
-            "write-neg-02"
+            "write-neg-02",
+            "write-neg-03"
           ]
         }
       ],
       "tests": {
-        "passed": 7,
+        "passed": 9,
         "failed": 0,
         "failingExampleIds": []
       },
@@ -295,13 +315,15 @@
             "flag-03",
             "flag-04",
             "flag-05",
+            "flag-06",
             "flag-neg-01",
-            "flag-neg-02"
+            "flag-neg-02",
+            "flag-neg-03"
           ]
         }
       ],
       "tests": {
-        "passed": 7,
+        "passed": 9,
         "failed": 0,
         "failingExampleIds": []
       },
@@ -310,11 +332,14 @@
     {
       "id": "entry-point",
       "type": "entry_point",
-      "engine": "regex",
-      "regex": {
-        "pattern": "^\\s*ENTRY\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*->",
-        "flags": "i",
-        "multiline": false
+      "engine": "exact",
+      "exact": {
+        "tokens": [
+          "ENTRY",
+          "(?<name>)",
+          "->"
+        ],
+        "caseSensitive": false
       },
       "captures": {
         "name": "name"
@@ -330,13 +355,15 @@
             "entry-03",
             "entry-04",
             "entry-05",
+            "entry-06",
             "entry-neg-01",
-            "entry-neg-02"
+            "entry-neg-02",
+            "entry-neg-03"
           ]
         }
       ],
       "tests": {
-        "passed": 7,
+        "passed": 9,
         "failed": 0,
         "failingExampleIds": []
       },

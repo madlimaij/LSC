@@ -5,7 +5,7 @@ import {
   VALIDATION_RULES,
   validateRuleSet,
 } from '../../src/contract/index.js';
-import { invalidFixtures, readJson, VALID_FIXTURE } from './helpers.js';
+import { differingPaths, invalidFixtures, readJson, VALID_FIXTURE } from './helpers.js';
 
 describe('valid fixture contract/fixtures/toylang.ruleset.json', () => {
   const result = validateRuleSet(readJson(VALID_FIXTURE));
@@ -55,8 +55,28 @@ describe('invalid fixtures contract/fixtures/invalid/*.json', () => {
         expect(issue.rule).toBe(fixture.rule);
         expect(issue.message.length).toBeGreaterThan(0);
       }
-      // Cross-field fixtures differ from the valid fixture in one place: exactly one issue.
+      // Cross-field fixtures differ from the valid fixture in one place (enforced below): exactly one issue.
       if (fixture.rule !== 'schema') expect(result.issues).toHaveLength(1);
     },
   );
+
+  it.each(fixtures.map((f) => [f.file, f] as const))(
+    '%s differs from the current valid fixture in exactly one place',
+    (_file, fixture) => {
+      // Every invalid fixture is the valid fixture with one mutation. If the valid
+      // fixture changes, re-derive the invalid ones so this stays true.
+      expect(differingPaths(readJson(VALID_FIXTURE), readJson(fixture.path))).toHaveLength(1);
+    },
+  );
+
+  it('differingPaths counts one place per changed, added or removed member', () => {
+    expect(differingPaths({ a: 1, b: [1, 2] }, { a: 1, b: [1, 2] })).toEqual([]);
+    expect(differingPaths({ a: 1 }, { a: 2 })).toEqual(['/a']);
+    expect(differingPaths({ a: 1 }, {})).toEqual(['/a']);
+    expect(differingPaths({ a: 1 }, { a: 1, b: 2 })).toEqual(['/b']);
+    expect(differingPaths({ t: ['X', 'Y'] }, { t: ['Y'] })).toEqual(['/t']);
+    expect(differingPaths({ r: [{ id: 'x', n: 1 }] }, { r: [{ id: 'y', n: 2 }] })).toEqual(['/r/0/id', '/r/0/n']);
+    expect(differingPaths({ r: [{ id: 'x' }] }, { r: [] })).toEqual(['/r/0']);
+    expect(differingPaths(1, 2)).toEqual(['/']);
+  });
 });
