@@ -1,0 +1,172 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`one full toylang file: scan + mapping (WP-04 acceptance criteria) > matches the committed snapshot 1`] = `
+{
+  "analysis": {
+    "configRefs": [
+      {
+        "key": "fast_shipping",
+        "line": 11,
+        "ruleId": "config-flag",
+        "source": "calc_total",
+      },
+    ],
+    "dbAccesses": [
+      {
+        "line": 5,
+        "mode": "read",
+        "ruleId": "db-read",
+        "source": "calc_total",
+        "table": "orders",
+      },
+      {
+        "line": 6,
+        "mode": "read",
+        "ruleId": "db-read",
+        "source": "calc_total",
+        "table": "order_lines",
+      },
+      {
+        "line": 8,
+        "mode": "write",
+        "ruleId": "db-write",
+        "source": "calc_total",
+        "table": "totals",
+      },
+    ],
+    "entryPoints": [
+      {
+        "line": 16,
+        "name": "run_billing",
+        "ruleId": "entry-point",
+      },
+    ],
+    "relations": [
+      {
+        "callee": "apply",
+        "kind": "calls",
+        "line": 10,
+        "module": "tax",
+        "ruleId": "call-statement",
+        "source": "calc_total",
+      },
+      {
+        "callee": "book",
+        "kind": "calls",
+        "line": 12,
+        "module": "shipping",
+        "ruleId": "call-statement",
+        "source": "calc_total",
+      },
+    ],
+    "symbols": [
+      {
+        "kind": "module",
+        "line": 1,
+        "name": "billing",
+        "ruleId": "module-declaration",
+      },
+      {
+        "kind": "procedure",
+        "line": 3,
+        "name": "calc_total",
+        "ruleId": "proc-definition",
+      },
+    ],
+    "uncertainties": [],
+  },
+  "matches": [
+    {
+      "captures": {
+        "name": "billing",
+      },
+      "column": 1,
+      "line": 1,
+      "ruleId": "module-declaration",
+      "type": "module_declaration",
+    },
+    {
+      "captures": {
+        "kind": "PROC",
+        "name": "calc_total",
+      },
+      "column": 1,
+      "line": 3,
+      "ruleId": "proc-definition",
+      "type": "symbol_definition",
+    },
+    {
+      "captures": {
+        "table": "orders",
+      },
+      "column": 3,
+      "enclosingSymbol": "calc_total",
+      "line": 5,
+      "ruleId": "db-read",
+      "type": "db_read",
+    },
+    {
+      "captures": {
+        "table": "order_lines",
+      },
+      "column": 3,
+      "enclosingSymbol": "calc_total",
+      "line": 6,
+      "ruleId": "db-read",
+      "type": "db_read",
+    },
+    {
+      "captures": {
+        "table": "totals",
+      },
+      "column": 3,
+      "enclosingSymbol": "calc_total",
+      "line": 8,
+      "ruleId": "db-write",
+      "type": "db_write",
+    },
+    {
+      "captures": {
+        "callee": "apply",
+        "module": "tax",
+      },
+      "column": 3,
+      "enclosingSymbol": "calc_total",
+      "line": 10,
+      "ruleId": "call-statement",
+      "type": "call",
+    },
+    {
+      "captures": {
+        "key": "fast_shipping",
+      },
+      "column": 6,
+      "enclosingSymbol": "calc_total",
+      "line": 11,
+      "ruleId": "config-flag",
+      "type": "config_ref",
+    },
+    {
+      "captures": {
+        "callee": "book",
+        "module": "shipping",
+      },
+      "column": 5,
+      "enclosingSymbol": "calc_total",
+      "line": 12,
+      "ruleId": "call-statement",
+      "type": "call",
+    },
+    {
+      "captures": {
+        "name": "run_billing",
+      },
+      "column": 1,
+      "line": 16,
+      "ruleId": "entry-point",
+      "type": "entry_point",
+    },
+  ],
+  "warnings": [],
+}
+`;

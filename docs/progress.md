@@ -6,11 +6,11 @@
 | WP-01 | Skeleton and tooling | contract-architect | — | done (reviewed wave 1) |
 | WP-02 | Rule Set contract | contract-architect | WP-01 | done (reviewed wave 1) |
 | WP-03 | Example format + toylang | contract-architect | WP-02 | done (reviewed wave 1) |
-| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | in progress |
-| WP-05 | Test runner | engine-builder | WP-04 | not started |
-| WP-06 | Skill ingestion | skill-ingester | WP-03 | done (repo-wide checks pending WP-04; awaiting wave 2 review) |
+| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | done (awaiting wave 2 review) |
+| WP-05 | Test runner | engine-builder | WP-04 | in progress |
+| WP-06 | Skill ingestion | skill-ingester | WP-03 | done (awaiting wave 2 review) |
 | WP-07 | Report + review CLI | report-builder | WP-05 | not started |
-| WP-08 | Model provider layer | llm-integrator | WP-02 | done (repo-wide checks pending WP-04; awaiting wave 2 review) |
+| WP-08 | Model provider layer | llm-integrator | WP-02 | done (awaiting wave 2 review) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | not started |
 | WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | not started |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
@@ -179,3 +179,25 @@ Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 **Deviations:** (1) Sub-headings such as `### Traps` are folded into the parent construct's section (prose and anchor). (2) Extra diagnostic: positive examples disagree on rule type. (3) `lsc ingest` adds `--json` and `--prose-limit`.
 
 **Open questions:** Proposed DECISIONS entry recorded as D18. No new dependencies.
+
+### WP-04: Rule engines (`engine-builder`, 2026-09-25)
+
+*(Appended by the orchestrator from the agent's final message; parallel wave.)*
+
+**What was built:** `src/engines/` — `lines.ts` (line endings, splitting, offset→line/column, CONTRACT.md §6.2), `masking.ts` (`maskText`, full and comment-only masks per §6.3), `prepare.ts` (`prepareFile`), `regex-run.ts` (`runRegexPerLine`, `runRegexWholeText`; RE2 compiled once per rule), `match-rule.ts` (`matchRule`, `matchBlockEnd`; exact engine via `exactToRegex` from `src/contract`), `blocks.ts` (`scanFile`: `blockEnd` scopes per D4/§6.6, `enclosingSymbol`, `unmatched-block-end`/`unclosed-block` warnings), `mapping.ts` (`mapMatches` → Navigator-shaped records via `RULE_TYPE_SPEC`), `types.ts`, `index.ts`, `README.md`. Tests: `tests/engines/{lines,masking,match-rule,blocks,mapping,edge-cases,performance,toylang-snapshot}.test.ts`, fixture `tests/engines/fixtures/billing.tl`, snapshot `tests/engines/__snapshots__/toylang-snapshot.test.ts.snap`.
+
+**Acceptance criteria**
+- Engine interface `match(rule, preparedFile) -> Match[]` — **met** (`match-rule.test.ts`).
+- Exact engine (tokens, `caseSensitive`) — **met** (`match-rule.test.ts` "exact engine").
+- Regex engine: RE2 only, per-line default, whole-text with `multiline: true`, correct lines — **met** (`match-rule.test.ts` "regex engine"; only `re2` used, D3).
+- Masking keeps lines and columns — **met** (`masking.test.ts`; `match-rule.test.ts` "columns and lines stay exact after masking").
+- Block tracking, nested and unclosed (warnings, not errors) — **met** (`blocks.test.ts`, `edge-cases.test.ts`).
+- Mapping via `RULE_TYPE_SPEC`, low confidence also yields an uncertainty — **met** (`mapping.test.ts`).
+- Performance guard, 50,000-line file — **met** (`performance.test.ts`; ~1.3 s measured, asserts < 5 s).
+- Keyword inside comment or string never matches — **met** (`masking.test.ts`, `match-rule.test.ts`, `toylang-snapshot.test.ts`).
+- Mapping output for a full toylang file matches a committed snapshot — **met** (`toylang-snapshot.test.ts`).
+- typecheck/lint/test — **met** repo-wide (orchestrator re-ran: 35 files, 386 tests, lint clean). This also completes the repo-wide checks for WP-06 and WP-08.
+
+**Deviations:** (1) RE2 pattern compiled once per rule and reused across lines (per-line compilation took ~15 s on the guard file). (2) `fileMatchers` glob selection (CONTRACT.md §6.1) is not in `src/engines/`; left to `src/runner/` (WP-05). (3) Navigator's `NormalizedFileAnalysis` is not defined in the contract, so `NavigatorAnalysis` and per-record types are defined in `src/engines/mapping.ts` from CONTRACT.md §4.
+
+**Open questions:** (a) CONTRACT.md §9 Q2 implemented as proposed: `kind` capture starting with `func` → `function`, else `procedure`. (b) New: a relation/db-access/config-ref match with no open definition scope (e.g. module-level `INCLUDE` when `module_declaration` has no `blockEnd`, as in the toylang fixture) produces no primary record, only an uncertainty `missing-source-symbol`. Related to §9 Q3 and Q5; should be added to CONTRACT.md §9 by `contract-architect`.
