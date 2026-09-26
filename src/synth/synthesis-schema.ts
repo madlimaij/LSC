@@ -58,6 +58,14 @@ export const ConstructSynthesisSchema = z.strictObject({
   reason: z.string().optional(),
   /** Id of the rule in the draft Rule Set (validated or rejected), when there is one. */
   ruleId: z.string().optional(),
+  /**
+   * WP-10 recompile (`lsc compile --previous`): version of the previous exported Rule Set whose rule was
+   * reused, re-tested by the runner on the current examples, with no model call (`attempts` is empty).
+   * Absent when the construct was synthesised. Optional: older synthesis.json files have no such field.
+   */
+  reusedFrom: z.string().optional(),
+  /** WP-10 recompile: why the previous rule was reused, or why it was not (then the construct was synthesised). Only with `--previous`. */
+  reuseNote: z.string().optional(),
   attempts: z.array(ConstructAttemptSchema),
 });
 
@@ -69,9 +77,24 @@ export const SynthesisReportSchema = z.strictObject({
   status: z.enum(['completed', 'failed', 'aborted']),
   error: z.string().optional(),
   maxAttemptsPerConstruct: z.int().min(1),
+  /**
+   * WP-10 recompile: present when `lsc compile --previous` was given. `force`: `--force` (nothing reused).
+   * Optional: older synthesis.json files have no such field.
+   */
+  reuse: z
+    .strictObject({
+      previousVersion: z.string(),
+      force: z.boolean(),
+    })
+    .optional(),
   lexical: z.strictObject({
-    status: z.enum(['accepted', 'rejected', 'not-justified', 'no-documentation', 'not-attempted']),
+    /** `reused`: the previous Rule Set's settings (general Skill files unchanged), no model call; `settings` holds them, `attempts` is empty. */
+    status: z.enum(['accepted', 'reused', 'rejected', 'not-justified', 'no-documentation', 'not-attempted']),
     reason: z.string().optional(),
+    /** With `status: "reused"`: version of the previous Rule Set. */
+    reusedFrom: z.string().optional(),
+    /** WP-10 recompile: why the settings were reused or synthesised again. Only with `--previous`. */
+    reuseNote: z.string().optional(),
     settings: LexicalSettingsSchema.optional(),
     attempts: z.array(LexicalAttemptSchema),
   }),
@@ -83,6 +106,8 @@ export const SynthesisReportSchema = z.strictObject({
     notJustified: z.int().min(0),
     skipped: z.int().min(0),
     notAttempted: z.int().min(0),
+    /** WP-10 recompile: constructs whose previous rule was reused (they also count in `validated`). Only with `--previous`. */
+    reused: z.int().min(0).optional(),
   }),
   /** Model usage as reported per call (input + output tokens), and number of calls. */
   usage: z.strictObject({

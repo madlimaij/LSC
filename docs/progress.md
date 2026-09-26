@@ -539,3 +539,45 @@ f. `explainConfidence`'s reason string starts with the level word (`"high — ..
 - CONTRACT.md §3 "remapped" makes a pure group rename (same roles, same output) a major bump. That is conservative; the owner may prefer patch, but the diff cannot prove the output is the same.
 - A construct that was rejected or not justified last time has no exported rule, so every recompile re-synthesises it (model calls with an unchanged Skill file). Acceptable, or should the previous draft/synthesis.json also be an input?
 - When a general Skill file changes, the lexical settings are re-synthesised but construct rules are still reused if they pass under the new settings. Should a lexical change force every construct to be re-synthesised instead?
+
+### WP-10 compile wiring (`llm-integrator`, 2026-09-26)
+
+Cross-folder part of WP-10, requests (a)–(d) of the WP-10 completion note, built against the interface in `src/release/README.md` (commit bb2ea89).
+
+**What was built**
+- `src/synth/compile.ts`: `CompileOptions.reuse?: (ingest: IngestResult) => CompileReuse`, plus the types `CompileReuse` (`previousVersion`, `force`, `lexical?: { settings, note }`, `lexicalNote?`, `construct?: (construct, lexical, allExamples) => ConstructReuse | undefined`) and `ConstructReuse` (`outcome?`, `note`). If `lexical` is given, `synthesizeLexical` is skipped. The construct callback runs before `synthesizeConstruct`, and when it returns an `outcome` that outcome is used with no model call. src/synth does not import src/release (src/release imports src/synth, so that would be a cycle). The CLI builds the hook.
+- `src/synth/synthesis-schema.ts`: optional reuse fields (listed below).
+- `src/cli/commands/compile.ts`: `--previous <file>`, `--force`, `--export <file>`. `reuseFrom()` uses `planReuse` and `reuseConstruct`, and `--export` calls `exportFiles` (all imported from src/release). The summary shows reused lines.
+- `src/synth/README.md`: new section "Recompile: `--previous`, `--force`, `--export` (WP-10)", with a table of the fields.
+- `tests/synth/recompile-cli.test.ts` (8 tests). It imports `tests/release/scenarios.ts` (`editDbWriteSkill`, `DB_WRITE_REGEX`, `recordingsFor`), which writes the one hand-written db-write recording into a temp directory. Nothing was added under fixtures/.
+
+**synthesis.json fields for report-builder** (all optional, so older files still load; unchanged when `--previous` is not given)
+- `reuse: { previousVersion: string, force: boolean }` (top level): present when `--previous` was given.
+- `lexical.status`: the enum gains `"reused"`. `lexical.settings` then holds the reused settings and `lexical.attempts` is `[]`.
+- `lexical.reusedFrom: string`: the previous version, set when the status is `"reused"`.
+- `lexical.reuseNote: string`: why the settings were reused or synthesised again (e.g. `general Skill file(s) changed or new: language-basics.md`, `--force`).
+- `constructs[].reusedFrom: string`: the previous version whose rule was reused. The status is `validated`, `attempts` is `[]`, and there was no model call. Absent when the construct was synthesised.
+- `constructs[].reuseNote: string`: why the rule was reused or not (e.g. `Skill file(s) changed or new: db-write.md`, `the previous rule fails the current examples: …`, `no validated rule \`x\` in 1.0.0`, `--force`).
+- `summary.reused: int`: how many constructs were reused. They also count in `validated`.
+
+**Acceptance criteria**
+- (a) The reuse hook skips lexical synthesis and reuses an unchanged construct without a model call: **met**. `recompile-cli.test.ts` › "after editing db-write.md, only db-write reaches the provider…" (snippet log of the second run = `['db-write']`, no `lexical` request, `usage.calls` 1) and › "nothing changed: no model call at all…" (log empty).
+- A reused rule is re-tested by the runner, so the model never decides: **met**. › "a previous rule that fails the current examples is synthesised again, with the reason recorded" (a sabotaged exported rule goes to the provider, and `reuseNote` gives the failure).
+- (b) Reused results are marked, and the schema stays backward compatible: **met**. The first test asserts `lexical.status: "reused"`, `reusedFrom: "1.0.0"`, `summary.reused: 7`, and per-construct `reusedFrom`/`reuseNote`. › "a synthesis.json written before the reuse fields still loads". All existing synthesis/report tests are unchanged and pass.
+- (c) `--previous`, `--force`, `--export` with `lsc export`'s refusals (D31): **met**. › "--force synthesises everything again…" (the requests match a full compile, `reuse.force: true`). › "refuses before any model call: …" covers `--force` without `--previous`, a draft as `--previous`, a `--previous` for another language, and an existing `--export` without `--previous` (file left untouched, no log entries). › "--export after a compile with a rejected construct drops it". › "an aborted compile is not exported".
+- (d) End-to-end CLI test: compile, export 1.0.0 via `--export`, edit db-write.md, then `compile --previous … --export …`: **met**. Only db-write reaches the provider, the result is `1.0.1`, and the CHANGELOG entry has exactly two items: "`db-write`: pattern changed (engine exact → regex)" and "Skill files edited: db-write.md".
+- WP-10 brief acceptance "…re-synthesises only that construct" through `lsc compile`: now **met** (same test).
+- D16 g and D19 d intact: prompts are unchanged, the sample is still read only after the last model call, and `assertRecordingAllowed` still runs before any provider use. `tests/synth/privacy.test.ts` and `compile-cli.test.ts` pass unchanged.
+- `npm run typecheck`, `npm run lint`: clean. `npm test`: 70 files, 724 tests passed (716 before + 8).
+
+**Deviations from the proposal**
+1. `CompileOptions.reuse` is a factory `(ingest) => CompileReuse`, not a plain object. `planReuse` needs the ingest that `compileLanguage` does, and this avoids ingesting twice.
+2. The construct callback returns `{ outcome?, note }` instead of `ConstructOutcome | undefined`. That way synthesis.json can say why a construct was *not* reused (`reuseNote`).
+3. Additions: `reuseNote`, `summary.reused` and top-level `reuse`.
+4. `--previous` is checked before any model call, with the same conditions `exportRuleSet` applies. `--export` refuses early when the target exists without `--previous` or is one of compile's own output files, so no tokens are spent on a compile that cannot be exported.
+5. `--force` without `--previous` is a usage error (exit 1). An aborted or failed compile is never exported, because missing constructs would otherwise count as removals (major bump). Export refusals exit 1. On success the compile exit code (0/2) is kept.
+
+**Open questions**
+- report-builder: show `reusedFrom` / `reuseNote` ("reused from 1.0.0, no model call"). Today a reused construct shows `attemptCount: 0` and the lexical status prints as `reused`, which is correct but not explained.
+- The contract-architect open questions still apply: constructs rejected or not justified last time are always re-synthesised, and a lexical change does not force construct re-synthesis (reused rules are only re-tested under the new settings).
+- `src/cli/commands/README.md` (not owned here) does not describe `lsc compile`. The flags are documented in `src/synth/README.md`.

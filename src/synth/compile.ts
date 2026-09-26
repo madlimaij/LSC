@@ -12,19 +12,51 @@ import { basename, dirname, join, resolve, sep } from 'node:path';
 import FastGlob from 'fast-glob';
 import { CONTRACT_VERSION, validateRuleSet, formatIssue, type RuleSet } from '../contract/index.js';
 import { formatLoadError, normalizeCode, type Example } from '../examples/index.js';
-import { ingestSkills, type IngestOptions, type IngestResult } from '../ingest/index.js';
+import { ingestSkills, type Construct, type IngestOptions, type IngestResult } from '../ingest/index.js';
 import { LlmError, type LlmProvider } from '../llm/index.js';
 import { runRules, type Results, type SampleFile } from '../runner/index.js';
 import { synthesizeConstruct, type ConstructOutcome } from './construct-loop.js';
 import { synthesizeLexical, type LexicalOutcome } from './lexical.js';
 import { buildModelSource, type ModelSourceInput } from './model-source.js';
 import type { LexicalDoc, PromptLimits } from './prompts.js';
+import type { LexicalSettings } from './schema.js';
 import type { ConstructSynthesis, SynthesisReport } from './synthesis-schema.js';
 
 /** Content version of a draft Rule Set; `lsc export` (WP-10) assigns the real one. */
 export const DRAFT_VERSION = '0.0.0-draft';
 
 export const DEFAULT_MAX_OUTPUT_TOKENS = 2048;
+
+/**
+ * What a construct callback decided (WP-10 recompile). `outcome` set: the
+ * previous rule is reused as it is, no model call. `outcome` absent: the
+ * construct is synthesised as usual. `note` says why, either way, and goes
+ * into synthesis.json (`reuseNote`).
+ */
+export interface ConstructReuse {
+  readonly outcome?: ConstructOutcome;
+  readonly note: string;
+}
+
+/**
+ * Reuse of a previous exported Rule Set (WP-10 brief: "Unchanged Skill files
+ * reuse previous rules without a model call"). The decisions themselves are
+ * made by src/release (`planReuse`, `reuseConstruct`); this module only
+ * applies them, so the runner still decides (a reused rule has been re-tested
+ * on the current examples by the callback).
+ */
+export interface CompileReuse {
+  /** Version of the previous Rule Set; recorded as `reusedFrom`. */
+  readonly previousVersion: string;
+  /** `--force`: recorded in synthesis.json (`reuse.force`). */
+  readonly force: boolean;
+  /** Lexical settings to use instead of calling `synthesizeLexical`; absent: synthesise them. */
+  readonly lexical?: { readonly settings: LexicalSettings; readonly note: string };
+  /** Why the lexical settings are synthesised again (when `lexical` is absent). */
+  readonly lexicalNote?: string;
+  /** Called before `synthesizeConstruct`, with the lexical settings of this compile. */
+  readonly construct?: (construct: Construct, lexical: LexicalSettings, allExamples: readonly Example[]) => ConstructReuse | undefined;
+}
 
 export interface CompileOptions {
   readonly skillsDir: string;
@@ -40,6 +72,11 @@ export interface CompileOptions {
   readonly now?: () => Date;
   readonly limits?: PromptLimits;
   readonly ingest?: IngestOptions;
+  /**
+   * Recompile against a previous exported Rule Set (`lsc compile --previous`).
+   * Built from this compile's ingest, which the reuse plan needs.
+   */
+  readonly reuse?: (ingest: IngestResult) => CompileReuse;
 }
 
 export interface CompileOutput {
@@ -80,23 +117,46 @@ function isoSeconds(date: Date): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
-function toConstructSynthesis(outcome: ConstructOutcome): ConstructSynthesis {
+/** One construct's result, with how the reuse plan treated it when a previous Rule Set was given. */
+interface Processed {
+  readonly outcome: ConstructOutcome;
+  readonly reusedFrom?: string;
+  readonly reuseNote?: string;
+}
+
+function toConstructSynthesis({ outcome, reusedFrom, reuseNote }: Processed): ConstructSynthesis {
   return {
     constructId: outcome.constructId,
     ...(outcome.ruleType !== undefined ? { ruleType: outcome.ruleType } : {}),
     status: outcome.status,
     ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}),
     ...(outcome.rule !== undefined ? { ruleId: outcome.rule.id } : {}),
+    ...(reusedFrom !== undefined ? { reusedFrom } : {}),
+    ...(reuseNote !== undefined ? { reuseNote } : {}),
     attempts: outcome.attempts.map((a) => ({ ...a })),
   };
 }
 
-function lexicalSection(outcome: LexicalOutcome | undefined): SynthesisReport['lexical'] {
-  if (outcome === undefined) return { status: 'not-attempted', attempts: [] };
+/** The lexical settings of this compile: synthesised (`outcome`) or reused from the previous Rule Set. */
+type LexicalState =
+  | { readonly kind: 'synthesised'; readonly outcome: LexicalOutcome }
+  | { readonly kind: 'reused'; readonly settings: LexicalSettings; readonly from: string; readonly note: string };
+
+function settingsOf(state: LexicalState | undefined): LexicalSettings | undefined {
+  if (state === undefined) return undefined;
+  if (state.kind === 'reused') return state.settings;
+  return state.outcome.status === 'accepted' ? state.outcome.settings : undefined;
+}
+
+function lexicalSection(state: LexicalState | undefined, reuse: CompileReuse | undefined): SynthesisReport['lexical'] {
+  if (state === undefined) return { status: 'not-attempted', attempts: [] };
+  if (state.kind === 'reused') return { status: 'reused', reusedFrom: state.from, reuseNote: state.note, settings: state.settings, attempts: [] };
+  const { outcome } = state;
   const attempts = outcome.attempts.map((a) => ({ ...a }));
+  const note = reuse?.lexicalNote !== undefined ? { reuseNote: reuse.lexicalNote } : {};
   return outcome.status === 'accepted'
-    ? { status: 'accepted', settings: outcome.settings, attempts }
-    : { status: outcome.status, reason: outcome.reason, attempts };
+    ? { status: 'accepted', ...note, settings: outcome.settings, attempts }
+    : { status: outcome.status, reason: outcome.reason, ...note, attempts };
 }
 
 export async function compileLanguage(options: CompileOptions): Promise<CompileOutput> {
@@ -104,32 +164,46 @@ export async function compileLanguage(options: CompileOptions): Promise<CompileO
   const ingest = ingestSkills(options.skillsDir, options.ingest);
   const allExamples: Example[] = ingest.constructs.flatMap((c) => c.examples);
 
-  let lexical: LexicalOutcome | undefined;
-  const outcomes: ConstructOutcome[] = [];
+  const reuse = options.reuse?.(ingest);
+
+  let lexicalState: LexicalState | undefined;
+  const processed: Processed[] = [];
   const notAttempted: ConstructSynthesis[] = [];
   let error: string | undefined;
 
   try {
-    lexical = await synthesizeLexical(options.provider, {
-      languageId: options.languageId,
-      docs: generalSkillDocs(options.skillsDir, ingest),
-      maxAttempts: options.maxAttempts,
-      maxOutputTokens: options.maxOutputTokens,
-      ...(options.limits !== undefined ? { limits: options.limits } : {}),
-    });
-    if (lexical.status === 'accepted') {
+    if (reuse?.lexical !== undefined) {
+      lexicalState = { kind: 'reused', settings: reuse.lexical.settings, from: reuse.previousVersion, note: reuse.lexical.note };
+    } else {
+      lexicalState = {
+        kind: 'synthesised',
+        outcome: await synthesizeLexical(options.provider, {
+          languageId: options.languageId,
+          docs: generalSkillDocs(options.skillsDir, ingest),
+          maxAttempts: options.maxAttempts,
+          maxOutputTokens: options.maxOutputTokens,
+          ...(options.limits !== undefined ? { limits: options.limits } : {}),
+        }),
+      };
+    }
+    const settings = settingsOf(lexicalState);
+    if (settings !== undefined) {
       for (const construct of ingest.constructs) {
-        outcomes.push(
-          await synthesizeConstruct(options.provider, {
-            languageId: options.languageId,
-            construct,
-            allExamples,
-            lexical: lexical.settings,
-            maxAttempts: options.maxAttempts,
-            maxOutputTokens: options.maxOutputTokens,
-            ...(options.limits !== undefined ? { limits: options.limits } : {}),
-          }),
-        );
+        const decided = reuse?.construct?.(construct, settings, allExamples);
+        if (decided?.outcome !== undefined && reuse !== undefined) {
+          processed.push({ outcome: decided.outcome, reusedFrom: reuse.previousVersion, reuseNote: decided.note });
+          continue;
+        }
+        const outcome = await synthesizeConstruct(options.provider, {
+          languageId: options.languageId,
+          construct,
+          allExamples,
+          lexical: settings,
+          maxAttempts: options.maxAttempts,
+          maxOutputTokens: options.maxOutputTokens,
+          ...(options.limits !== undefined ? { limits: options.limits } : {}),
+        });
+        processed.push({ outcome, ...(decided !== undefined ? { reuseNote: decided.note } : {}) });
       }
     }
   } catch (err) {
@@ -137,6 +211,9 @@ export async function compileLanguage(options: CompileOptions): Promise<CompileO
     if (!(err instanceof LlmError)) throw err;
     error = `${err.name}: ${err.message}`;
   }
+  const outcomes = processed.map((p) => p.outcome);
+  const lexicalSettings = settingsOf(lexicalState);
+  const lexicalOutcome = lexicalState?.kind === 'synthesised' ? lexicalState.outcome : undefined;
   if (error !== undefined) {
     const done = new Set(outcomes.map((o) => o.constructId));
     for (const construct of ingest.constructs) {
@@ -146,10 +223,10 @@ export async function compileLanguage(options: CompileOptions): Promise<CompileO
     }
   }
 
-  const constructs = [...outcomes.map(toConstructSynthesis), ...notAttempted];
-  const attempts = [...(lexical?.attempts ?? []), ...outcomes.flatMap((o) => o.attempts)];
+  const constructs = [...processed.map(toConstructSynthesis), ...notAttempted];
+  const attempts = [...(lexicalOutcome?.attempts ?? []), ...outcomes.flatMap((o) => o.attempts)];
   const count = (status: ConstructSynthesis['status']): number => constructs.filter((c) => c.status === status).length;
-  const status: SynthesisReport['status'] = error !== undefined ? 'aborted' : lexical?.status !== 'accepted' ? 'failed' : 'completed';
+  const status: SynthesisReport['status'] = error !== undefined ? 'aborted' : lexicalSettings === undefined ? 'failed' : 'completed';
   const generatedAt = isoSeconds(now());
 
   const synthesis: SynthesisReport = {
@@ -159,11 +236,12 @@ export async function compileLanguage(options: CompileOptions): Promise<CompileO
     status,
     ...(error !== undefined
       ? { error }
-      : lexical !== undefined && lexical.status !== 'accepted'
-        ? { error: `lexical settings: ${lexical.reason}` }
+      : lexicalOutcome !== undefined && lexicalOutcome.status !== 'accepted'
+        ? { error: `lexical settings: ${lexicalOutcome.reason}` }
         : {}),
     maxAttemptsPerConstruct: options.maxAttempts,
-    lexical: lexicalSection(lexical),
+    ...(reuse !== undefined ? { reuse: { previousVersion: reuse.previousVersion, force: reuse.force } } : {}),
+    lexical: lexicalSection(lexicalState, reuse),
     constructs,
     summary: {
       constructs: constructs.length,
@@ -172,6 +250,7 @@ export async function compileLanguage(options: CompileOptions): Promise<CompileO
       notJustified: count('not-justified'),
       skipped: count('skipped'),
       notAttempted: count('not-attempted'),
+      ...(reuse !== undefined ? { reused: constructs.filter((c) => c.reusedFrom !== undefined).length } : {}),
     },
     usage: {
       inputTokens: attempts.reduce((sum, a) => sum + a.usage.inputTokens, 0),
@@ -184,7 +263,7 @@ export async function compileLanguage(options: CompileOptions): Promise<CompileO
     ingestDiagnostics: ingest.diagnostics.map(formatLoadError),
   };
 
-  if (lexical?.status !== 'accepted') {
+  if (lexicalSettings === undefined) {
     return { synthesis, ingest };
   }
 
@@ -195,7 +274,7 @@ export async function compileLanguage(options: CompileOptions): Promise<CompileO
     compiledAt: generatedAt,
     compilerVersion: options.compilerVersion,
     sourceSkills: ingest.sourceSkills.map((s) => ({ path: s.path, sha256: s.sha256 })),
-    ...lexical.settings,
+    ...lexicalSettings,
     rules: outcomes.flatMap((o) => (o.rule !== undefined ? [o.rule] : [])),
   };
   const checked = validateRuleSet(draft);

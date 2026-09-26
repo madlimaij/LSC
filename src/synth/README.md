@@ -87,6 +87,7 @@ it before a provider is constructed.
 ```
 lsc compile <skills-dir> [--sample <dir>] [--provider <name>] [--recordings <dir>]
             [--config <file>] [--out <dir>] [--language-id <id>] [--max-attempts <n>]
+            [--previous <exported ruleset> [--force]] [--export <file>]
 ```
 
 Writes to `--out` (default `.lsc/out`): `<languageId>.ruleset.draft.json`,
@@ -116,3 +117,37 @@ refused recording, lexical settings failed, compile aborted).
 
 `--provider fake --recordings <dir>` replays recordings offline. Otherwise
 `--provider` must name the provider configured in `lsc.config.json`.
+
+## Recompile: `--previous`, `--force`, `--export` (WP-10)
+
+`--previous <file>` is the last exported Rule Set of the language (checked
+before any model call: a release version, no rejected rules, same language,
+D31 b). The CLI builds a `CompileOptions.reuse` hook from it with
+`planReuse` / `reuseConstruct` (src/release, import only; src/synth itself
+does not import src/release, which imports src/synth):
+
+- lexical settings: reused (no `synthesizeLexical` call) when every general
+  Skill file is unchanged and none was removed;
+- each construct: before `synthesizeConstruct`, the callback reuses the
+  previous rule when its Skill files are unchanged **and** the runner still
+  passes it on the current examples under the current lexical settings.
+  Otherwise the construct is synthesised as usual. The model never decides.
+
+`--force` (only with `--previous`) reuses nothing. `--export <file>` runs
+`exportFiles` (src/release) on the draft after the outputs are written, with
+`--previous` as the previous export; it has `lsc export`'s refusals (an
+existing file needs `--previous`; checked before any model call). An aborted
+or failed compile is never exported (its missing rules would read as
+removals). An export refusal exits 1.
+
+`synthesis.json` fields (all optional, so older files still load):
+
+| Field | Meaning |
+| --- | --- |
+| `reuse: { previousVersion, force }` | present when `--previous` was given |
+| `lexical.status: "reused"` | settings taken from the previous Rule Set; `settings` holds them, `attempts` is `[]` |
+| `lexical.reusedFrom` | previous version, with `status: "reused"` |
+| `lexical.reuseNote` | why the settings were reused or synthesised again (with `--previous`) |
+| `constructs[].reusedFrom` | previous version whose rule was reused (status `validated`, `attempts: []`, no model call) |
+| `constructs[].reuseNote` | why the rule was reused or not (with `--previous`) |
+| `summary.reused` | number of reused constructs (they also count in `validated`; with `--previous`) |
