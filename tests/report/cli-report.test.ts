@@ -240,4 +240,67 @@ describe('lsc report', () => {
     expect(err.join('')).not.toContain('WARNING');
     expect(out.join('')).toContain('every Skill file hash still matches');
   });
+
+  it('a 0.0.0-draft Rule Set warns near the verdict that it must not be delivered to Navigator, in both formats (D27 item d)', async () => {
+    const draftResultsFile = join(tmp, 'draft-results.json');
+    const results = runRules(loadFixtureRuleSet(), fixtureExamples(), loadSampleFiles(), {
+      now: () => '2026-09-26T00:00:00.000Z',
+      compilerVersion: '0.1.0',
+    });
+    writeFileSync(draftResultsFile, JSON.stringify({ ...results, ruleSetVersion: '0.0.0-draft' }));
+
+    expect(await runCli(draftResultsFile)).toBe(0);
+    expect(out.join('')).toMatch(/Draft Rule Set: must not be delivered to Navigator/);
+
+    out = [];
+    expect(await runCli(draftResultsFile, '--format', 'html')).toBe(0);
+    expect(out.join('')).toMatch(/Draft Rule Set: must not be delivered to Navigator/);
+  });
+
+  it('a rejected rule says "rejected" and that export drops it, in the coverage row and the rule\'s own heading (D27 item d)', async () => {
+    const ruleSet = cloneRuleSet();
+    const dbRead = ruleSet.rules.find((r) => r.id === 'db-read');
+    if (dbRead?.engine !== 'regex') throw new Error('expected db-read to be a regex rule');
+    dbRead.regex = { ...dbRead.regex, multiline: false };
+    const brokenResultsFile = join(tmp, 'broken-results-2.json');
+    const results = runRules(ruleSet, fixtureExamples(), [], { now: () => '2026-09-26T00:00:00.000Z', compilerVersion: '0.1.0' });
+    writeFileSync(brokenResultsFile, JSON.stringify(results));
+
+    expect(await runCli(brokenResultsFile)).toBe(1);
+    const text = out.join('');
+    expect(text).toMatch(/rejected \(dropped at export\)/);
+    expect(text).toMatch(/DEFECT.*rejected \(dropped at export\)/);
+  });
+
+  it('the confidence line shows the level once, not twice ("high — high — ...", D27 item f)', async () => {
+    expect(await runCli(resultsFile)).toBe(0);
+    const text = out.join('');
+    expect(text).not.toMatch(/\*\*high\*\*[^\n]*high — /);
+    expect(text).toMatch(/Confidence: \*\*high\*\* \(declared: high\) — \d+\/\d+ own positive/);
+  });
+
+  it('a compact per-rule unreviewed-sample-match table appears near the top, after Coverage, linking to each rule section (D27 item c)', async () => {
+    expect(await runCli(resultsFile)).toBe(0);
+    const text = out.join('');
+    const coverageAt = text.indexOf('## Coverage');
+    const tableAt = text.indexOf('## Unreviewed sample matches per rule');
+    const rulesAt = text.indexOf('## Rules');
+    expect(tableAt).toBeGreaterThan(coverageAt);
+    expect(tableAt).toBeLessThan(rulesAt);
+    expect(text).toContain('[`db-read`](#rule-db-read)');
+  });
+
+  it('--ruleset + --skills-dir warns (stderr and report) about a Skill file added after compile (D27 defect A4)', async () => {
+    const rulesetFile = join(tmp, 'toylang.ruleset.json');
+    writeFileSync(rulesetFile, JSON.stringify(loadFixtureRuleSet()));
+    const skillsDir = join(tmp, 'toylang-skills-new');
+    cpSync(SKILLS_DIR, skillsDir, { recursive: true });
+    writeFileSync(join(skillsDir, 'new-construct.md'), '# a construct documented after this Rule Set was compiled\n');
+
+    expect(await runCli(resultsFile, '--ruleset', rulesetFile, '--skills-dir', skillsDir)).toBe(0);
+    expect(err.join('')).toContain('WARNING');
+    expect(err.join('')).toMatch(/new-construct\.md.*not used by this Rule Set/);
+    expect(out.join('')).toMatch(/new-construct\.md/); // also visible in the rendered report, not stderr-only
+    expect(out.join('')).toContain('not used by this Rule Set');
+  });
 });

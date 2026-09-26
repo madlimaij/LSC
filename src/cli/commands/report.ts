@@ -17,7 +17,7 @@ import type { Example } from '../../examples/index.js';
 import { ingestSkills } from '../../ingest/index.js';
 import { buildReport, renderHtml, renderMarkdown } from '../../report/index.js';
 import { indexExamplesById } from '../../report/example-location.js';
-import { describeSkillHashMismatch, findSkillHashMismatches } from '../../report/skill-hash-check.js';
+import { describeNewSkillFile, describeSkillHashMismatch, findNewSkillFiles, findSkillHashMismatches } from '../../report/skill-hash-check.js';
 import { loadResultsFile } from '../../report/load-results.js';
 import { SynthesisReportSchema, type SynthesisReport } from '../../synth/index.js';
 
@@ -91,6 +91,12 @@ export function configure(cmd: Command): void {
         const mismatches = findSkillHashMismatches(ruleSet.sourceSkills, currentSourceSkills);
         for (const mismatch of mismatches) {
           process.stderr.write(`WARNING: ${describeSkillHashMismatch(mismatch)}\n`);
+        }
+        // D27 defect A4: a Skill file added since compile is also worth a warning, not only a
+        // changed/removed one.
+        const newFiles = findNewSkillFiles(ruleSet.sourceSkills, currentSourceSkills);
+        for (const path of newFiles) {
+          process.stderr.write(`WARNING: ${describeNewSkillFile(path)}\n`);
         }
       }
 

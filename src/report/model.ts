@@ -106,6 +106,14 @@ export interface OverallVerdict {
   readonly constructsWithoutUsableRule: readonly string[];
   /** Sum of every rule's `sampleMatches.length` (D25 item 2: shown in the verdict line, e.g. "138 sample matches not yet reviewed"). */
   readonly unreviewedSampleMatchCount: number;
+  /**
+   * `results.filesScanned.length > 0` (G2 round, D27 item b / defect A5): a sample scan actually
+   * ran. When false, the verdict must say "no sample repository scanned", not "no unreviewed
+   * sample matches" — those read as the same good news, but only one of them is.
+   */
+  readonly sampleScanned: boolean;
+  /** Number of sample files the scan covered (`results.filesScanned.length`), 0 when none was scanned. */
+  readonly filesScannedCount: number;
 }
 
 /** The Rule Set's language-wide lexical settings (docs/PLAN.md §5.1), shown so a reader does not have to open the Rule Set JSON (D25 item 2). Only present with `--ruleset`. */
@@ -121,6 +129,28 @@ export interface SynthesisAttemptView {
   readonly attempt: number;
   readonly outcome: string;
   readonly problems: readonly string[];
+}
+
+/** What one lexical-settings attempt proposed (D27 item e: the model's proposal, or `notJustified`, verbatim — no repository-sample text is ever involved here, unlike construct attempts). */
+export interface LexicalProposalView {
+  readonly fileMatchers: readonly string[];
+  readonly lineComment?: string;
+  readonly blockComment?: DelimiterPair;
+  readonly stringDelimiters?: readonly DelimiterPair[];
+  readonly notJustified?: string;
+}
+
+/**
+ * One attempt at the lexical settings (`synthesis.json`'s `lexical.attempts`, D27 item e): what was
+ * proposed and, for a refused attempt, why (e.g. a marker or glob literal that does not occur
+ * verbatim in the Skill files sent, D24 a) — shown next to the accepted lexical settings so a reader
+ * can see the whole negotiation, not only its outcome.
+ */
+export interface LexicalAttemptView {
+  readonly attempt: number;
+  readonly outcome: string;
+  readonly problems: readonly string[];
+  readonly proposal?: LexicalProposalView;
 }
 
 export interface SynthesisConstructView {
@@ -161,6 +191,8 @@ export interface SynthesisView {
   readonly error?: string;
   readonly lexicalStatus: string;
   readonly lexicalReason?: string;
+  /** D27 item e: every lexical-settings attempt, proposed and accepted/refused, in order. */
+  readonly lexicalAttempts: readonly LexicalAttemptView[];
   readonly constructs: readonly SynthesisConstructView[];
   readonly summary: { readonly constructs: number; readonly validated: number; readonly rejected: number; readonly notJustified: number; readonly skipped: number; readonly notAttempted: number };
   readonly usage: SynthesisUsageView;
@@ -195,4 +227,10 @@ export interface Report {
   readonly synthesis?: SynthesisView;
   /** Only present with both `--ruleset` and `--skills-dir`; empty when every hash still matches. */
   readonly skillHashMismatches?: readonly SkillHashMismatch[];
+  /**
+   * Skill files present under `--skills-dir` that this Rule Set's `sourceSkills` does not cite at
+   * all (added since compile; D27 defect A4). Only present with both `--ruleset` and `--skills-dir`;
+   * empty when there are none.
+   */
+  readonly newSkillFiles?: readonly string[];
 }

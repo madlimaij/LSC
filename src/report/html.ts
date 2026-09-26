@@ -13,6 +13,7 @@ import type {
   RuleReport,
   WrongCaptureEntry,
 } from './model.js';
+import { reasonWithoutLeadingLevel } from './confidence-reason.js';
 
 function esc(text: string): string {
   return text
@@ -103,6 +104,9 @@ function renderExtraMatches(entries: readonly ExtraMatchEntry[]): string {
   return `<h4>Extra matches on positive examples</h4>${body}`;
 }
 
+/** Long per-rule sample-match lists collapse behind `<details>` (D27 item c), so the page stays scannable; short lists stay open. */
+const COLLAPSE_THRESHOLD = 5;
+
 function renderSampleMatches(rule: RuleReport): string {
   if (rule.sampleMatches.length === 0) return '';
   const body = rule.sampleMatches
@@ -114,7 +118,11 @@ function renderSampleMatches(rule: RuleReport): string {
       return `<li><code>${esc(match.file)}:${String(match.line)}</code>${enclosing}: ${esc(captureText(match.captures))}<pre class="snippet">${code}</pre></li>`;
     })
     .join('');
-  return `<h4>Unreviewed sample matches (${String(rule.sampleMatches.length)})</h4><p class="muted">Run <code>lsc review</code> to label them.</p><ul>${body}</ul>`;
+  const heading = `<h4>Unreviewed sample matches (${String(rule.sampleMatches.length)})</h4><p class="muted">Run <code>lsc review</code> to label them.</p>`;
+  if (rule.sampleMatches.length > COLLAPSE_THRESHOLD) {
+    return `${heading}<details><summary>Show ${String(rule.sampleMatches.length)} matches</summary><ul>${body}</ul></details>`;
+  }
+  return `${heading}<ul>${body}</ul>`;
 }
 
 function renderProvenance(rule: RuleReport): string {
@@ -134,11 +142,11 @@ function renderRule(rule: RuleReport): string {
       : 'unavailable (pass <code>--ruleset</code>)';
   return `
 <section class="rule ${statusClass}" id="rule-${esc(rule.ruleId)}">
-  <h3><code>${esc(rule.ruleId)}</code> (${esc(rule.type)}) &mdash; <span class="badge ${statusClass}">${rule.ok ? 'OK' : 'DEFECT'}</span></h3>
+  <h3><code>${esc(rule.ruleId)}</code> (${esc(rule.type)}) &mdash; <span class="badge ${statusClass}">${rule.ok ? 'OK' : 'DEFECT &mdash; rejected (dropped at export)'}</span></h3>
   <ul class="facts">
     <li>Pattern: <code>${pattern}</code></li>
     <li>Captures: ${captures}</li>
-    <li>Confidence: <strong>${esc(rule.computedConfidence ?? 'rejected')}</strong> (declared: ${esc(rule.declaredConfidence)}) &mdash; ${esc(rule.confidenceReason)}</li>
+    <li>Confidence: <strong>${esc(rule.computedConfidence ?? 'rejected')}</strong> (declared: ${esc(rule.declaredConfidence)}) &mdash; ${esc(reasonWithoutLeadingLevel(rule.confidenceReason))}</li>
     ${rule.declaredMismatchNote !== undefined ? `<li class="warn">${esc(rule.declaredMismatchNote)}</li>` : ''}
     <li>Pass rate (own examples): ${String(Math.round(rule.passRate * 1000) / 10)}% (${String(rule.testsPassed)}/${String(rule.testsPassed + rule.testsFailed)})</li>
     ${rule.missingExampleIds.length > 0 ? `<li class="warn">Missing examples cited in sourceEvidence but not found: ${esc(rule.missingExampleIds.join(', '))}</li>` : ''}
@@ -184,22 +192,71 @@ function renderSkillHashMismatches(report: Report): string {
   );
 }
 
-function renderLexical(report: Report): string {
-  if (report.lexical === undefined) {
-    return `<p class="muted">Lexical settings unavailable (pass <code>--ruleset</code> to <code>lsc report</code>).</p>`;
-  }
-  const l = report.lexical;
-  const fileMatchers = l.fileMatchers.map((g) => `<code>${esc(g)}</code>`).join(', ');
-  const lineComment = l.lineComment !== undefined ? `<code>${esc(l.lineComment)}</code>` : '<em>(none)</em>';
-  const blockComment = l.blockComment !== undefined ? `<code>${esc(l.blockComment.start)}</code> … <code>${esc(l.blockComment.end)}</code>` : '<em>(none)</em>';
-  const stringDelimiters =
-    l.stringDelimiters !== undefined && l.stringDelimiters.length > 0
-      ? l.stringDelimiters.map((d) => `<code>${esc(d.start)}</code> … <code>${esc(d.end)}</code>`).join(', ')
-      : '<em>(none)</em>';
+/** Skill files under `--skills-dir` this Rule Set was never compiled from (D27 defect A4). */
+function renderNewSkillFiles(report: Report): string {
+  if (report.newSkillFiles === undefined || report.newSkillFiles.length === 0) return '';
+  const body = report.newSkillFiles.map((path) => `<li class="warn"><code>${esc(path)}</code>: new Skill file not used by this Rule Set</li>`).join('');
   return (
-    `<ul class="facts"><li>File matchers: ${fileMatchers}</li><li>Line comment: ${lineComment}</li>` +
-    `<li>Block comment: ${blockComment}</li><li>String delimiters: ${stringDelimiters}</li></ul>`
+    `<p class="warn">New Skill file(s) under <code>--skills-dir</code> not used by this Rule Set (added since it was compiled; ` +
+    `recompile to use them):</p><ul>${body}</ul>`
   );
+}
+
+/** One lexical proposal (D27 item e), as a compact description: the fileMatchers/markers it offered, or `notJustified`'s reason. */
+function describeLexicalProposalHtml(proposal: NonNullable<Report['synthesis']>['lexicalAttempts'][number]['proposal']): string {
+  if (proposal === undefined) return '(no proposal on this attempt)';
+  if (proposal.notJustified !== undefined) return `not justified: ${esc(proposal.notJustified)}`;
+  const parts = [
+    `file matchers ${proposal.fileMatchers.map((g) => `<code>${esc(g)}</code>`).join(', ')}`,
+    proposal.lineComment !== undefined ? `line comment <code>${esc(proposal.lineComment)}</code>` : undefined,
+    proposal.blockComment !== undefined ? `block comment <code>${esc(proposal.blockComment.start)}</code> … <code>${esc(proposal.blockComment.end)}</code>` : undefined,
+    proposal.stringDelimiters !== undefined && proposal.stringDelimiters.length > 0
+      ? `string delimiters ${proposal.stringDelimiters.map((d) => `<code>${esc(d.start)}</code> … <code>${esc(d.end)}</code>`).join(', ')}`
+      : undefined,
+  ].filter((part): part is string => part !== undefined);
+  return parts.join('; ');
+}
+
+/**
+ * D27 item e: the lexical proposal history, next to the accepted settings — each attempt, what was
+ * proposed, and why a refused one was refused. Only available with `--synthesis`.
+ */
+function renderLexicalProposalHistory(report: Report): string {
+  const attempts = report.synthesis?.lexicalAttempts;
+  if (attempts === undefined) {
+    return `<p class="muted">Lexical proposal history unavailable (pass <code>--synthesis &lt;file&gt;</code> to <code>lsc report</code>).</p>`;
+  }
+  if (attempts.length === 0) return `<p class="muted">(no lexical attempts recorded)</p>`;
+  const items = attempts
+    .map(
+      (a) =>
+        `<li>attempt ${String(a.attempt)}: <strong>${esc(a.outcome)}</strong> &mdash; proposed: ${describeLexicalProposalHtml(a.proposal)}` +
+        `${a.problems.length > 0 ? ` &mdash; refused because: ${escCode(a.problems.join(' | '))}` : ''}</li>`,
+    )
+    .join('');
+  return `<ul>${items}</ul>`;
+}
+
+function renderLexical(report: Report): string {
+  const accepted =
+    report.lexical === undefined
+      ? `<p class="muted">Lexical settings unavailable (pass <code>--ruleset</code> to <code>lsc report</code>).</p>`
+      : (() => {
+          const l = report.lexical as NonNullable<Report['lexical']>;
+          const fileMatchers = l.fileMatchers.map((g) => `<code>${esc(g)}</code>`).join(', ');
+          const lineComment = l.lineComment !== undefined ? `<code>${esc(l.lineComment)}</code>` : '<em>(none)</em>';
+          const blockComment =
+            l.blockComment !== undefined ? `<code>${esc(l.blockComment.start)}</code> … <code>${esc(l.blockComment.end)}</code>` : '<em>(none)</em>';
+          const stringDelimiters =
+            l.stringDelimiters !== undefined && l.stringDelimiters.length > 0
+              ? l.stringDelimiters.map((d) => `<code>${esc(d.start)}</code> … <code>${esc(d.end)}</code>`).join(', ')
+              : '<em>(none)</em>';
+          return (
+            `<ul class="facts"><li>File matchers: ${fileMatchers}</li><li>Line comment: ${lineComment}</li>` +
+            `<li>Block comment: ${blockComment}</li><li>String delimiters: ${stringDelimiters}</li></ul>`
+          );
+        })();
+  return `${accepted}<h4>Proposal history</h4><p class="muted">D27 item e; from <code>synthesis.json</code>, next to the accepted settings above.</p>${renderLexicalProposalHistory(report)}`;
 }
 
 function renderSynthesisAttempts(attempts: NonNullable<Report['synthesis']>['constructs'][number]['attempts']): string {
@@ -211,6 +268,30 @@ function renderSynthesisAttempts(attempts: NonNullable<Report['synthesis']>['con
     )
     .join('');
   return `<ul>${items}</ul>`;
+}
+
+/**
+ * D27 item d: a `0.0.0-draft` Rule Set (D24 g / D25 item 5) must never be delivered to Navigator.
+ */
+function draftWarningHtml(report: Report): string {
+  if (report.ruleSetVersion !== '0.0.0-draft') return '';
+  return (
+    '<p class="warn"><strong>Draft Rule Set: must not be delivered to Navigator.</strong> Version ' +
+    '<code>0.0.0-draft</code> means <code>lsc export</code> has not yet assigned this Rule Set a real version (D24 g, D25 item 5).</p>'
+  );
+}
+
+/**
+ * D27 item a: "not produced by a real model" also belongs next to the verdict (the Synthesis
+ * section keeps its own statement too, `renderModelSource` below). Only available with `--synthesis`.
+ */
+function modelSourceWarningNearVerdictHtml(report: Report): string {
+  const modelSource = report.synthesis?.modelSource;
+  if (modelSource === undefined || !modelSource.notRealModel) return '';
+  return (
+    '<p class="warn"><strong>Not produced by a real model</strong>: the rules in this Rule Set come from hand-written ' +
+    '(or partly hand-written) answers, not a live or recorded model call &mdash; see the Synthesis section below (<code>modelSource</code>).</p>'
+  );
 }
 
 /**
@@ -277,10 +358,29 @@ function confidenceReasonPointer(row: Report['coverage'][number]): string {
   return row.ruleIds.map((id) => `see <a href="#rule-${esc(id)}"><code>${esc(id)}</code></a> below`).join('; ');
 }
 
+/**
+ * D27 item c: a compact table, near the top (after Coverage), of the unreviewed sample match count
+ * per rule with a link to its section. The inline per-rule listing (`renderSampleMatches`) stays too.
+ */
+function renderSampleMatchCounts(report: Report): string {
+  const rows = report.rules.filter((rule) => rule.sampleMatches.length > 0);
+  if (rows.length === 0) {
+    return `<p class="muted">None (no rule has any unreviewed sample match).</p>`;
+  }
+  const body = rows
+    .map(
+      (rule) =>
+        `<tr><td><a href="#rule-${esc(rule.ruleId)}"><code>${esc(rule.ruleId)}</code></a></td><td>${esc(rule.type)}</td><td>${String(rule.sampleMatches.length)}</td></tr>`,
+    )
+    .join('');
+  return `<table><thead><tr><th>Rule</th><th>Type</th><th>Unreviewed matches</th></tr></thead><tbody>${body}</tbody></table>`;
+}
+
 function renderCoverage(report: Report): string {
   const rows = report.coverage
     .map((row) => {
-      const status = row.status === 'no-rule' ? 'no validated rule' : row.status;
+      // D27 item d: a rejected rule's coverage row says so plainly, and that export drops it (D25 item 5).
+      const status = row.status === 'no-rule' ? 'no validated rule' : row.status === 'rejected' ? 'rejected (dropped at export)' : row.status;
       const confidence = row.confidences.length === 0 ? '&mdash;' : esc([...new Set(row.confidences)].join(', '));
       const ruleIds = row.ruleIds.length === 0 ? '&mdash;' : esc(row.ruleIds.join(', '));
       return `<tr class="cov-${esc(row.status)}"><td>${esc(row.ruleType)}</td><td>${esc(status)}</td><td>${confidence}</td><td>${ruleIds}</td><td>${confidenceReasonPointer(row)}</td></tr>`;
@@ -340,19 +440,29 @@ export function renderHtml(report: Report): string {
 
 <div class="verdict-box verdict-${esc(overall.verdict)}">
   <p><strong>${esc(overall.summary)}</strong></p>
+  ${draftWarningHtml(report)}
+  ${modelSourceWarningNearVerdictHtml(report)}
   <ul>
     <li>Rule Set: <code>${esc(report.languageId)}</code> version <code>${esc(report.ruleSetVersion)}</code> (compiled with lsc <code>${esc(report.compilerVersion)}</code>, generated ${esc(report.generatedAt)})</li>
     <li>Validated rules (high/medium confidence, own tests pass): ${String(overall.validatedRuleCount)}</li>
     <li>Low-confidence rules: ${String(overall.lowConfidenceRuleCount)}</li>
     <li>Rejected/broken rules: ${String(overall.rejectedRuleCount)}</li>
     <li>Example pass rate (own examples): ${passRatePct}% (${String(totalOwnPassed)}/${String(overall.totalOwnExamples)})</li>
-    <li>Unreviewed sample matches: ${String(overall.unreviewedSampleMatchCount)}${overall.unreviewedSampleMatchCount > 0 ? ' (run <code>lsc review</code>)' : ''}</li>
+    <li>Unreviewed sample matches: ${String(overall.unreviewedSampleMatchCount)}${overall.unreviewedSampleMatchCount > 0 ? ' (run <code>lsc review</code>)' : ''} (${String(overall.filesScannedCount)} sample file(s) scanned)</li>
+    <li><strong>Sample coverage shows matches only</strong>: it cannot show constructs the rules missed in the sample. ${
+      overall.sampleScanned
+        ? 'Misses in the sample must be found by reviewing it (<code>lsc review</code>), not by reading this report.'
+        : 'No sample repository was scanned at all here, so even that is unavailable &mdash; pass <code>--sample &lt;dir&gt;</code> to <code>lsc test</code>/<code>lsc compile</code>.'
+    }</li>
     <li>${overall.constructsWithoutUsableRule.length > 0 ? `Constructs without a usable rule: ${esc(overall.constructsWithoutUsableRule.join(', '))}` : 'Every construct with examples has a usable rule'}</li>
   </ul>
 </div>
 
 <h2>Coverage</h2>
 ${renderCoverage(report)}
+
+<h2>Unreviewed sample matches per rule</h2>
+${renderSampleMatchCounts(report)}
 
 <h2>Lexical settings</h2>
 ${renderLexical(report)}
@@ -369,6 +479,7 @@ ${renderSynthesis(report)}
 <h3>Skill file hashes</h3>
 ${renderSourceSkills(report)}
 ${renderSkillHashMismatches(report)}
+${renderNewSkillFiles(report)}
 
 </body>
 </html>

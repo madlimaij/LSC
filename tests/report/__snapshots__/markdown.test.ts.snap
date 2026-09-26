@@ -12,7 +12,8 @@ exports[`renderMarkdown > matches the snapshot for the healthy toylang fixture, 
 - Low-confidence rules: 0
 - Rejected/broken rules: 0
 - Example pass rate (own examples): 100% (74/74)
-- Unreviewed sample matches: 138 (run \`lsc review\`)
+- Unreviewed sample matches: 138 (run \`lsc review\`) (20 sample file(s) scanned)
+- **Sample coverage shows matches only**: it cannot show constructs the rules missed in the sample. Misses in the sample must be found by reviewing it (\`lsc review\`), not by reading this report.
 - Every construct with examples has a usable rule
 
 ## Coverage
@@ -28,12 +29,29 @@ exports[`renderMarkdown > matches the snapshot for the healthy toylang fixture, 
 | config_ref | validated | high | config-flag | see [\`config-flag\`](#rule-config-flag) below |
 | entry_point | validated | high | entry-point | see [\`entry-point\`](#rule-entry-point) below |
 
+## Unreviewed sample matches per rule
+
+| Rule | Type | Unreviewed matches |
+| --- | --- | --- |
+| [\`module-declaration\`](#rule-module-declaration) | module_declaration | 20 |
+| [\`proc-definition\`](#rule-proc-definition) | symbol_definition | 35 |
+| [\`call-statement\`](#rule-call-statement) | call | 20 |
+| [\`include-directive\`](#rule-include-directive) | include | 14 |
+| [\`db-read\`](#rule-db-read) | db_read | 20 |
+| [\`db-write\`](#rule-db-write) | db_write | 13 |
+| [\`config-flag\`](#rule-config-flag) | config_ref | 9 |
+| [\`entry-point\`](#rule-entry-point) | entry_point | 7 |
+
 ## Lexical settings
 
 - File matchers: \`**/*.tl\`
 - Line comment: \`--\`
 - Block comment: \`/*\` … \`*/\`
 - String delimiters: \`"\` … \`"\`
+
+**Proposal history** (D27 item e; from \`synthesis.json\`, next to the accepted settings above):
+
+_Lexical proposal history unavailable (pass \`--synthesis <file>\` to \`lsc report\`)._
 
 ## Rules
 
@@ -42,7 +60,7 @@ exports[`renderMarkdown > matches the snapshot for the healthy toylang fixture, 
 
 - Pattern: \`exact: MODULE <token> (case-insensitive)\`
 - Captures: name → name
-- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Confidence: **high** (declared: high) — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
 - Pass rate (own examples): 100% (9/9)
 
 **Representative matches** (passed positive examples):
@@ -277,7 +295,7 @@ _None._
 
 - Pattern: \`regex: /^\\s*(?<kind>PROC|FUNC)\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)/i (per line)\`
 - Captures: kind → kind, name → name
-- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Confidence: **high** (declared: high) — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
 - Pass rate (own examples): 100% (9/9)
 
 **Representative matches** (passed positive examples):
@@ -740,7 +758,7 @@ _None._
 
 - Pattern: \`regex: /\\bCALL\\s+(?:(?<module>[A-Za-z_][A-Za-z0-9_]*)\\.)?(?<callee>[A-Za-z_][A-Za-z0-9_]*)\\s*\\(/i (per line)\`
 - Captures: callee → callee, module → module
-- Confidence: **high** (declared: high) — high — 7/7 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Confidence: **high** (declared: high) — 7/7 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
 - Pass rate (own examples): 100% (10/10)
 
 **Representative matches** (passed positive examples):
@@ -1040,7 +1058,7 @@ _None._
 
 - Pattern: \`regex: /^\\s*INCLUDE\\s+"(?<target>[^"]+)"/i (per line)\`
 - Captures: target → target
-- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Confidence: **high** (declared: high) — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
 - Pass rate (own examples): 100% (9/9)
 
 **Representative matches** (passed positive examples):
@@ -1237,7 +1255,7 @@ _None._
 
 - Pattern: \`regex: /\\bREAD\\s+(?:&\\s+)?(?<table>[A-Za-z_][A-Za-z0-9_]*)/i (whole file)\`
 - Captures: table → table
-- Confidence: **high** (declared: high) — high — 7/7 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Confidence: **high** (declared: high) — 7/7 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
 - Pass rate (own examples): 100% (10/10)
 
 **Representative matches** (passed positive examples):
@@ -1533,7 +1551,7 @@ _None._
 
 - Pattern: \`regex: /\\bWRITE\\s+(?<table>[A-Za-z_][A-Za-z0-9_]*)/i (per line)\`
 - Captures: table → table
-- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Confidence: **high** (declared: high) — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
 - Pass rate (own examples): 100% (9/9)
 
 **Representative matches** (passed positive examples):
@@ -1744,7 +1762,7 @@ _None._
 
 - Pattern: \`regex: /\\bFLAG\\s*\\(\\s*"(?<key>[^"]+)"\\s*\\)/i (per line)\`
 - Captures: key → key
-- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Confidence: **high** (declared: high) — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
 - Pass rate (own examples): 100% (9/9)
 
 **Representative matches** (passed positive examples):
@@ -1917,7 +1935,7 @@ _None._
 
 - Pattern: \`exact: ENTRY <token> -> (case-insensitive)\`
 - Captures: name → name
-- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Confidence: **high** (declared: high) — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
 - Pass rate (own examples): 100% (9/9)
 
 **Representative matches** (passed positive examples):
@@ -2070,6 +2088,7 @@ _Synthesis details unavailable (pass \`--synthesis <file>\` to \`lsc report\`)._
 - \`db-write.md\` — sha256 \`45a60588788bbce069eb6b24566f5a7828749d7ff4aa16f24f0a8318d4b5a3fe\`
 - \`config-flag.md\` — sha256 \`ea9696b64b82100786b84303cddf86cf1ead527c13d85c9ae8153c7b84ffc6c9\`
 - \`entry-point.md\` — sha256 \`1f3d265af107947941089481aa3fec7d9c115e3857e99ef7dc4b4a9ef588140c\`
+
 
 
 "

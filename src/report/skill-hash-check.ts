@@ -32,3 +32,19 @@ export function describeSkillHashMismatch(mismatch: SkillHashMismatch): string {
     ? `${mismatch.path}: in the Rule Set's sourceSkills (sha256 ${mismatch.ruleSetSha256}) but not found under --skills-dir`
     : `${mismatch.path}: sha256 differs (Rule Set ${mismatch.ruleSetSha256}, current ${mismatch.currentSha256})`;
 }
+
+/**
+ * Every Skill file present under the current `--skills-dir` that the Rule Set's `sourceSkills` does
+ * not cite at all (by path) — a Skill file added after this Rule Set was compiled (G2 round, D27
+ * defect A4: this case, the mirror image of `findSkillHashMismatches`' "removed" case, previously
+ * went unreported on both stderr and in the report).
+ */
+export function findNewSkillFiles(ruleSetSourceSkills: readonly SourceSkillLike[], currentSourceSkills: readonly SourceSkillLike[]): string[] {
+  const ruleSetPaths = new Set(ruleSetSourceSkills.map((s) => s.path));
+  return currentSourceSkills.filter((s) => !ruleSetPaths.has(s.path)).map((s) => s.path);
+}
+
+/** One line per new Skill file, for `lsc report`'s stderr warning and the report (D27 defect A4). */
+export function describeNewSkillFile(path: string): string {
+  return `${path}: new Skill file not used by this Rule Set (added since it was compiled — recompile to use it)`;
+}

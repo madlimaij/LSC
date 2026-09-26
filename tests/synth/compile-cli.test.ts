@@ -252,7 +252,7 @@ describe('lsc compile: a construct that never converges (scenario wp09-reject)',
     const html = res.reportHtml as string;
     const verdict = /^\*\*(REJECTED — .*)\*\*$/m.exec(md)?.[1];
     expect(verdict).toBeDefined();
-    expect(verdict).toContain('no unreviewed sample matches'); // no --sample in this run
+    expect(verdict).toContain('no sample repository scanned'); // no --sample in this run (G2 round, D27 item b / defect A5: "no sample scanned" now reads differently from "no unreviewed matches")
     expect(html).toContain(htmlEscaped(verdict as string));
     expectEveryOutcome(res);
     const call = res.synthesis.constructs.find((c) => c.constructId === 'call');

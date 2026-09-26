@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { declaredMismatchNote, explainConfidence, type ConfidenceStats } from '../../src/report/confidence-reason.js';
+import { declaredMismatchNote, explainConfidence, reasonWithoutLeadingLevel, type ConfidenceStats } from '../../src/report/confidence-reason.js';
 
 describe('explainConfidence', () => {
   it('rejected: passes no positive example', () => {
@@ -47,6 +47,21 @@ describe('explainConfidence', () => {
     const stats: ConfidenceStats = { positiveTotal: 5, positivePassed: 5, negativeTotal: 2, negativeFailed: 1, crossNegativeFailed: 0 };
     const reason = explainConfidence(stats, 'low');
     expect(reason).toContain('1 own negative example failed (medium needs none failing)');
+  });
+});
+
+describe('reasonWithoutLeadingLevel (G2 round, D27 item f: the level must not be shown twice)', () => {
+  it('strips a leading "<level> — " that matches explainConfidence\'s own format', () => {
+    const stats: ConfidenceStats = { positiveTotal: 5, positivePassed: 5, negativeTotal: 2, negativeFailed: 0, crossNegativeFailed: 0 };
+    const reason = explainConfidence(stats, 'high');
+    expect(reason).toMatch(/^high — /);
+    const stripped = reasonWithoutLeadingLevel(reason);
+    expect(stripped).not.toMatch(/^high — /);
+    expect(stripped).toContain('5/5');
+  });
+
+  it('leaves a reason with no leading level word unchanged', () => {
+    expect(reasonWithoutLeadingLevel('no validated rule for this type')).toBe('no validated rule for this type');
   });
 });
 

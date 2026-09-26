@@ -97,6 +97,19 @@ export function explainConfidence(stats: ConfidenceStats, computed: RuleResult['
   );
 }
 
+/**
+ * `explainConfidence` returns a string starting with the level word itself ("high — ...",
+ * "rejected — ..."), because it must be a complete, self-contained explanation on its own (it is
+ * also used, e.g., by any future consumer that shows the reason without a separate level label).
+ * The rule-section confidence line already shows the level once, in its own `**level**`; showing it
+ * again at the start of the reason read as "high — high — ..." (G2 round, D27 item f). This strips
+ * that redundant leading "<level> — " for display next to an already-shown level, without changing
+ * what `explainConfidence` itself returns.
+ */
+export function reasonWithoutLeadingLevel(reason: string): string {
+  return reason.replace(/^(high|medium|low|rejected)\s+—\s+/, '');
+}
+
 /** Notes a mismatch between the Rule Set's declared confidence and what the last run computed. */
 export function declaredMismatchNote(rule: Pick<RuleResult, 'declaredConfidence' | 'computedConfidence' | 'confidenceMatchesDeclared'>): string | undefined {
   if (rule.confidenceMatchesDeclared) return undefined;

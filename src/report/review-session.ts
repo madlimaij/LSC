@@ -6,7 +6,7 @@
  * CLI (`src/cli/commands/review.ts`).
  */
 import type { Rule, RuleSet } from '../contract/index.js';
-import type { CommentStringConfig } from '../engines/index.js';
+import { matchRule, prepareFile } from '../engines/index.js';
 import type { ReviewEntry, ReviewVerdict } from '../examples/index.js';
 import type { Results, RuleResult, SampleMatch } from '../runner/index.js';
 import { computeMatchSpan } from './match-span.js';
@@ -78,6 +78,22 @@ function captureKey(captures: Readonly<Record<string, string | undefined>>): str
 }
 
 /**
+ * The first *other* rule in `ruleSet` (by declaration order) that matches
+ * somewhere in `code`, or `undefined` if none does. Used by the
+ * `false_positive` refusal (D16 h / D19 a: a negative example must contain
+ * no match of *any* construct, not only the rule being reviewed — G2 round,
+ * D27 defect A2).
+ */
+function findOtherRuleMatch(ruleSet: RuleSet, ownRuleId: string, code: string): Rule | undefined {
+  const prepared = prepareFile(ruleSet, code);
+  for (const candidate of ruleSet.rules) {
+    if (candidate.id === ownRuleId) continue;
+    if (matchRule(candidate, prepared).length > 0) return candidate;
+  }
+  return undefined;
+}
+
+/**
  * Turns one decided sample match into a `reviews.yaml` entry (D9, D15,
  * src/examples/README.md §4). `code` is the lines the match *spans*
  * (`computeMatchSpan`, src/report/match-span.ts) — usually one line, but a
@@ -88,18 +104,23 @@ function captureKey(captures: Readonly<Record<string, string | undefined>>): str
  * any *other* match of the same rule on those lines makes the example
  * impossible to write as a negative (D16 h: "a negative example must
  * contain no match of any construct"), so this refuses rather than writing
- * an entry that a correct rule would then fail.
+ * an entry that a correct rule would then fail. D16 h and D19 a are not
+ * limited to the same rule: a `false_positive` is also refused, naming the
+ * other rule, when *any other rule in the Rule Set* matches somewhere in
+ * the spanned code (G2 round, D27 defect A2) — otherwise the written
+ * negative example would immediately fail that other rule the moment every
+ * rule is run against every negative example (plan §8 step 4, D16 h).
  */
 export function buildReviewEntry(
   item: UnreviewedMatch,
   rule: Rule,
-  maskingConfig: CommentStringConfig,
+  ruleSet: RuleSet,
   fileText: string,
   verdict: ReviewVerdict,
   id: string,
   options: BuildReviewEntryOptions = {},
 ): BuildReviewEntryResult {
-  const found = computeMatchSpan(rule, maskingConfig, fileText, item.match.line, item.match.column);
+  const found = computeMatchSpan(rule, ruleSet, fileText, item.match.line, item.match.column);
   if (found === undefined) {
     return {
       ok: false,
@@ -109,6 +130,9 @@ export function buildReviewEntry(
   const { span, sameRuleMatches } = found;
   const isSelf = (m: { line: number; column: number }): boolean => m.line === item.match.line && m.column === item.match.column;
   const others = sameRuleMatches.filter((m) => !isSelf(m));
+
+  const lines = fileText.replace(/\r\n/g, '\n').split('\n');
+  const code = lines.slice(span.startLine - 1, span.endLine).join('\n');
 
   if (verdict === 'false_positive' && others.length > 0) {
     const where = others.map((m) => `${String(m.line)}:${String(m.column)}`).join(', ');
@@ -121,8 +145,20 @@ export function buildReviewEntry(
     };
   }
 
-  const lines = fileText.replace(/\r\n/g, '\n').split('\n');
-  const code = lines.slice(span.startLine - 1, span.endLine).join('\n');
+  if (verdict === 'false_positive') {
+    const otherRule = findOtherRuleMatch(ruleSet, rule.id, code);
+    if (otherRule !== undefined) {
+      return {
+        ok: false,
+        reason:
+          `line${span.startLine === span.endLine ? ` ${String(span.startLine)}` : `s ${span.startLine.toString()}-${span.endLine.toString()}`} ` +
+          `of ${item.match.file} is also matched by rule "${otherRule.id}"; a negative example must contain no match of any construct ` +
+          `(D16 h, D19 a) — a false_positive for "${rule.id}" here would immediately fail "${otherRule.id}" as a cross-construct negative ` +
+          `— review or fix rule "${otherRule.id}" first, or edit reviews.yaml by hand to narrow the snippet`,
+      };
+    }
+  }
+
   const base = {
     id,
     construct: item.construct,

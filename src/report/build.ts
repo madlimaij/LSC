@@ -27,7 +27,7 @@ import type {
 } from './model.js';
 import { describeCaptures, describePattern } from './pattern.js';
 import { isRuleOk } from './rule-status.js';
-import { findSkillHashMismatches, type SourceSkillLike } from './skill-hash-check.js';
+import { findNewSkillFiles, findSkillHashMismatches, type SourceSkillLike } from './skill-hash-check.js';
 import { buildSynthesisView } from './synthesis-view.js';
 
 export interface BuildReportOptions {
@@ -231,11 +231,17 @@ function buildOverallVerdict(results: Results, rules: readonly RuleReport[]): Ov
   }
 
   const unreviewedSampleMatchCount = rules.reduce((sum, rule) => sum + rule.sampleMatches.length, 0);
+  const filesScannedCount = results.filesScanned.length;
+  const sampleScanned = filesScannedCount > 0;
 
   const verdictLabel = verdict === 'validated' ? 'VALIDATED' : verdict === 'low-confidence' ? 'LOW CONFIDENCE' : 'REJECTED';
   const passRatePct = Math.round(examplePassRate * 1000) / 10;
-  const sampleMatchesClause =
-    unreviewedSampleMatchCount === 0
+  // D27 item b / defect A5: "no sample repository scanned" and "no unreviewed sample matches" read
+  // as the same good news but are not — only a scan that actually ran and found nothing to flag
+  // earns the second, more reassuring phrasing.
+  const sampleMatchesClause = !sampleScanned
+    ? 'no sample repository scanned'
+    : unreviewedSampleMatchCount === 0
       ? 'no unreviewed sample matches'
       : `${String(unreviewedSampleMatchCount)} sample match${unreviewedSampleMatchCount === 1 ? '' : 'es'} not yet reviewed`;
   const summary =
@@ -253,6 +259,8 @@ function buildOverallVerdict(results: Results, rules: readonly RuleReport[]): Ov
     rejectedRuleCount: rejected.length,
     constructsWithoutUsableRule,
     unreviewedSampleMatchCount,
+    sampleScanned,
+    filesScannedCount,
   };
 }
 
@@ -285,7 +293,10 @@ export function buildReport(results: Results, options: BuildReportOptions = {}):
     ...(options.ruleSet !== undefined ? { lexical: buildLexical(options.ruleSet) } : {}),
     ...(options.synthesis !== undefined ? { synthesis: buildSynthesisView(options.synthesis) } : {}),
     ...(options.ruleSet !== undefined && options.currentSourceSkills !== undefined
-      ? { skillHashMismatches: findSkillHashMismatches(options.ruleSet.sourceSkills, options.currentSourceSkills) }
+      ? {
+          skillHashMismatches: findSkillHashMismatches(options.ruleSet.sourceSkills, options.currentSourceSkills),
+          newSkillFiles: findNewSkillFiles(options.ruleSet.sourceSkills, options.currentSourceSkills),
+        }
       : {}),
   };
 }

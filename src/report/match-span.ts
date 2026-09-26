@@ -79,6 +79,18 @@ function findMultilineEndLine(rule: Rule, maskingConfig: CommentStringConfig, fi
  * within that span. Returns `undefined` when the rule no longer matches at
  * that exact position (the sample file or the Rule Set changed since the
  * match was recorded).
+ *
+ * The span must cover not only the asked-about match's own extent, but also
+ * the full extent of every *other* same-rule match that starts inside it
+ * (G2 round, D27 defect A1): a whole-text rule can have a second match that
+ * starts on the same line as the first but itself continues onto a later
+ * line (`fixtures/toylang/sample-repo/customers/messages.tl:4`: `READ inbox
+ * WHERE owner = uid AND NOT read` has one match for `inbox`, plus a second,
+ * case-insensitive match on the trailing "read" that continues across the
+ * newline to capture `LET` on line 5). `reviews.yaml`'s `code` must contain
+ * every line any listed `expected` match needs, or a rebuilt review entry
+ * fails its own rule the moment it is replayed. Extending can pull in yet
+ * another match's own end line, so this repeats until nothing changes.
  */
 export function computeMatchSpan(rule: Rule, maskingConfig: CommentStringConfig, fileText: string, line: number, column: number): MatchSpanResult | undefined {
   const prepared = prepareFile(maskingConfig, fileText);
@@ -87,8 +99,23 @@ export function computeMatchSpan(rule: Rule, maskingConfig: CommentStringConfig,
   if (self === undefined) return undefined;
 
   const config = patternConfigOf(rule);
-  const endLine = config.multiline ? findMultilineEndLine(rule, maskingConfig, fileText, line, column) : line;
-  const span: MatchSpan = { startLine: line, endLine };
+  let span: MatchSpan = { startLine: line, endLine: config.multiline ? findMultilineEndLine(rule, maskingConfig, fileText, line, column) : line };
+
+  if (config.multiline) {
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const m of all) {
+        if (m.line < span.startLine || m.line > span.endLine) continue;
+        const matchEndLine = findMultilineEndLine(rule, maskingConfig, fileText, m.line, m.column);
+        if (matchEndLine > span.endLine) {
+          span = { startLine: span.startLine, endLine: matchEndLine };
+          grew = true;
+        }
+      }
+    }
+  }
+
   const sameRuleMatches = all.filter((m) => m.line >= span.startLine && m.line <= span.endLine);
   return { span, sameRuleMatches };
 }

@@ -13,7 +13,7 @@
  * `redactReviewProblem` keeps the example id, its polarity/role and the
  * `[review example]` tag, and drops everything after it.
  */
-import type { SynthesisConstructView, SynthesisModelSourceView, SynthesisUsageView, SynthesisView } from './model.js';
+import type { LexicalAttemptView, SynthesisConstructView, SynthesisModelSourceView, SynthesisUsageView, SynthesisView } from './model.js';
 import type { SynthesisReport } from '../synth/synthesis-schema.js';
 
 const REVIEW_TAG = '[review example]';
@@ -47,6 +47,29 @@ function buildModelSourceView(synthesis: SynthesisReport): SynthesisModelSourceV
   };
 }
 
+/** Builds the report's view of `synthesis.json`'s `lexical.attempts` (D27 item e). No repository-sample text is ever involved in a lexical proposal, so nothing here needs redaction. */
+function buildLexicalAttempts(synthesis: SynthesisReport): LexicalAttemptView[] {
+  return synthesis.lexical.attempts.map((attempt) => {
+    const p = attempt.proposal;
+    return {
+      attempt: attempt.attempt,
+      outcome: attempt.outcome,
+      problems: attempt.problems,
+      ...(p !== undefined
+        ? {
+            proposal: {
+              fileMatchers: p.fileMatchers,
+              ...(p.lineComment !== undefined ? { lineComment: p.lineComment } : {}),
+              ...(p.blockComment !== undefined ? { blockComment: p.blockComment } : {}),
+              ...(p.stringDelimiters !== undefined ? { stringDelimiters: p.stringDelimiters } : {}),
+              ...(p.notJustified !== undefined ? { notJustified: p.notJustified } : {}),
+            },
+          }
+        : {}),
+    };
+  });
+}
+
 /** Builds the report's view of one `synthesis.json` (D25 item 2). */
 export function buildSynthesisView(synthesis: SynthesisReport): SynthesisView {
   const constructs: SynthesisConstructView[] = synthesis.constructs.map((construct) => ({
@@ -71,6 +94,7 @@ export function buildSynthesisView(synthesis: SynthesisReport): SynthesisView {
     ...(synthesis.error !== undefined ? { error: synthesis.error } : {}),
     lexicalStatus: synthesis.lexical.status,
     ...(synthesis.lexical.reason !== undefined ? { lexicalReason: synthesis.lexical.reason } : {}),
+    lexicalAttempts: buildLexicalAttempts(synthesis),
     constructs,
     summary: { ...synthesis.summary },
     usage,

@@ -15,6 +15,7 @@ import type {
   SynthesisView,
   WrongCaptureEntry,
 } from './model.js';
+import { reasonWithoutLeadingLevel } from './confidence-reason.js';
 
 function captureText(captures: Readonly<Record<string, string | undefined>>): string {
   const entries = Object.entries(captures).filter((entry): entry is [string, string] => entry[1] !== undefined);
@@ -28,6 +29,29 @@ function snippetLines(snippet: LocatedSnippet | undefined, highlightLine?: numbe
   return `\n  location: ${snippet.location}\n  \`\`\`\n${code}\n  \`\`\`\n`;
 }
 
+/**
+ * D27 item d: a `0.0.0-draft` Rule Set (D24 g: the version `lsc compile`'s draft output always
+ * carries, before `lsc export` assigns a real one, D25 item 5) must never be delivered to Navigator.
+ */
+function draftWarning(report: Report): string | undefined {
+  if (report.ruleSetVersion !== '0.0.0-draft') return undefined;
+  return '**Draft Rule Set: must not be delivered to Navigator.** Version `0.0.0-draft` means `lsc export` has not yet assigned this Rule Set a real version (D24 g, D25 item 5).';
+}
+
+/**
+ * D27 item a: "not produced by a real model" also belongs next to the verdict, not only in the
+ * Synthesis section (which keeps its own statement, see `renderModelSource` below). Only available
+ * with `--synthesis` (`report.synthesis`).
+ */
+function modelSourceWarningNearVerdict(report: Report): string | undefined {
+  const modelSource = report.synthesis?.modelSource;
+  if (modelSource === undefined || !modelSource.notRealModel) return undefined;
+  return (
+    '**Not produced by a real model**: the rules in this Rule Set come from hand-written (or partly hand-written) answers, ' +
+    'not a live or recorded model call — see the Synthesis section below (`modelSource`).'
+  );
+}
+
 function renderVerdict(report: Report): string {
   const { overall } = report;
   const lines = [
@@ -35,12 +59,19 @@ function renderVerdict(report: Report): string {
     '',
     `**${overall.summary}**`,
     '',
+    ...(draftWarning(report) !== undefined ? [draftWarning(report) as string, ''] : []),
+    ...(modelSourceWarningNearVerdict(report) !== undefined ? [modelSourceWarningNearVerdict(report) as string, ''] : []),
     `- Rule Set: \`${report.languageId}\` version \`${report.ruleSetVersion}\` (compiled with lsc \`${report.compilerVersion}\`, generated ${report.generatedAt})`,
     `- Validated rules (high/medium confidence, own tests pass): ${String(overall.validatedRuleCount)}`,
     `- Low-confidence rules: ${String(overall.lowConfidenceRuleCount)}`,
     `- Rejected/broken rules: ${String(overall.rejectedRuleCount)}`,
     `- Example pass rate (own examples): ${String(Math.round(overall.examplePassRate * 1000) / 10)}% (${String(report.rules.reduce((s, r) => s + r.testsPassed, 0))}/${String(overall.totalOwnExamples)})`,
-    `- Unreviewed sample matches: ${String(overall.unreviewedSampleMatchCount)}${overall.unreviewedSampleMatchCount > 0 ? ' (run `lsc review`)' : ''}`,
+    `- Unreviewed sample matches: ${String(overall.unreviewedSampleMatchCount)}${overall.unreviewedSampleMatchCount > 0 ? ' (run `lsc review`)' : ''}` +
+      ` (${String(overall.filesScannedCount)} sample file(s) scanned)`,
+    '- **Sample coverage shows matches only**: it cannot show constructs the rules missed in the sample. ' +
+      (overall.sampleScanned
+        ? 'Misses in the sample must be found by reviewing it (`lsc review`), not by reading this report.'
+        : 'No sample repository was scanned at all here, so even that is unavailable — pass `--sample <dir>` to `lsc test`/`lsc compile`.'),
     overall.constructsWithoutUsableRule.length > 0
       ? `- Constructs without a usable rule: ${overall.constructsWithoutUsableRule.join(', ')}`
       : `- Every construct with examples has a usable rule`,
@@ -62,7 +93,8 @@ function confidenceReasonPointer(row: Report['coverage'][number]): string {
 
 function renderCoverage(report: Report): string {
   const rows = report.coverage.map((row) => {
-    const status = row.status === 'no-rule' ? 'no validated rule' : row.status;
+    // D27 item d: a rejected rule's coverage row says so plainly, and that export drops it (D25 item 5).
+    const status = row.status === 'no-rule' ? 'no validated rule' : row.status === 'rejected' ? 'rejected (dropped at export)' : row.status;
     const confidence = row.confidences.length === 0 ? '—' : [...new Set(row.confidences)].join(', ');
     const ruleIds = row.ruleIds.length === 0 ? '—' : row.ruleIds.join(', ');
     return `| ${row.ruleType} | ${status} | ${confidence} | ${ruleIds} | ${confidenceReasonPointer(row)} |`;
@@ -72,6 +104,28 @@ function renderCoverage(report: Report): string {
     '',
     '| Rule type | Status | Confidence | Rule(s) | Confidence reason |',
     '| --- | --- | --- | --- | --- |',
+    ...rows,
+  ].join('\n');
+}
+
+/**
+ * D27 item c: a compact table, near the top (after Coverage), of the unreviewed sample match count
+ * per rule with a link to its section — so a reader does not have to scroll every rule's own section
+ * just to see where review effort is needed. The inline per-rule listing (`renderSampleMatches`)
+ * stays too.
+ */
+function renderSampleMatchCounts(report: Report): string {
+  const rows = report.rules
+    .filter((rule) => rule.sampleMatches.length > 0)
+    .map((rule) => `| [\`${rule.ruleId}\`](#rule-${rule.ruleId}) | ${rule.type} | ${String(rule.sampleMatches.length)} |`);
+  if (rows.length === 0) {
+    return ['## Unreviewed sample matches per rule', '', '_None (no rule has any unreviewed sample match)._'].join('\n');
+  }
+  return [
+    '## Unreviewed sample matches per rule',
+    '',
+    '| Rule | Type | Unreviewed matches |',
+    '| --- | --- | --- |',
     ...rows,
   ].join('\n');
 }
@@ -156,7 +210,8 @@ function renderProvenance(rule: RuleReport): string {
 }
 
 function renderRule(rule: RuleReport): string {
-  const status = rule.ok ? 'OK' : 'DEFECT';
+  // D27 item d: a rejected rule's own heading also says so, and that export drops it (D25 item 5), not only "DEFECT".
+  const status = rule.ok ? 'OK' : 'DEFECT — rejected (dropped at export)';
   const parts = [
     `<a id="rule-${rule.ruleId}"></a>`,
     `### \`${rule.ruleId}\` (${rule.type}) — ${status}`,
@@ -165,7 +220,8 @@ function renderRule(rule: RuleReport): string {
     rule.captures !== undefined
       ? `- Captures: ${rule.captures.map(([role, group]) => `${role} → ${group}`).join(', ') || '(none)'}`
       : `- Captures: unavailable (pass \`--ruleset\`)`,
-    `- Confidence: **${rule.computedConfidence ?? 'rejected'}** (declared: ${rule.declaredConfidence}) — ${rule.confidenceReason}`,
+    // D27 item f: the level is shown once (here) — the reason no longer repeats it ("high — high — ...").
+    `- Confidence: **${rule.computedConfidence ?? 'rejected'}** (declared: ${rule.declaredConfidence}) — ${reasonWithoutLeadingLevel(rule.confidenceReason)}`,
     ...(rule.declaredMismatchNote !== undefined ? [`- ⚠ ${rule.declaredMismatchNote}`] : []),
     `- Pass rate (own examples): ${String(Math.round(rule.passRate * 1000) / 10)}% (${String(rule.testsPassed)}/${String(rule.testsPassed + rule.testsFailed)})`,
     ...(rule.missingExampleIds.length > 0
@@ -220,23 +276,68 @@ function renderSkillHashMismatches(report: Report): string {
   return `\n**⚠ Skill file hashes differ from \`--skills-dir\`** (reviewer Q5, D25 item 4): this Rule Set may not reflect the documentation currently on disk.\n\n${body}\n`;
 }
 
+/** Skill files under `--skills-dir` this Rule Set was never compiled from (D27 defect A4). */
+function renderNewSkillFiles(report: Report): string {
+  if (report.newSkillFiles === undefined || report.newSkillFiles.length === 0) return '';
+  const body = report.newSkillFiles.map((path) => `- ⚠ \`${path}\`: new Skill file not used by this Rule Set`).join('\n');
+  return `\n**⚠ New Skill file(s) under \`--skills-dir\` not used by this Rule Set** (added since it was compiled; recompile to use them):\n\n${body}\n`;
+}
+
+/** One lexical proposal (D27 item e), as a compact description: the fileMatchers/markers it offered, or `notJustified`'s reason. */
+function describeLexicalProposal(proposal: NonNullable<Report['synthesis']>['lexicalAttempts'][number]['proposal']): string {
+  if (proposal === undefined) return '(no proposal on this attempt)';
+  if (proposal.notJustified !== undefined) return `not justified: ${proposal.notJustified}`;
+  const parts = [
+    `file matchers ${proposal.fileMatchers.map((g) => `\`${g}\``).join(', ')}`,
+    proposal.lineComment !== undefined ? `line comment \`${proposal.lineComment}\`` : undefined,
+    proposal.blockComment !== undefined ? `block comment \`${proposal.blockComment.start}\` … \`${proposal.blockComment.end}\`` : undefined,
+    proposal.stringDelimiters !== undefined && proposal.stringDelimiters.length > 0
+      ? `string delimiters ${proposal.stringDelimiters.map((d) => `\`${d.start}\` … \`${d.end}\``).join(', ')}`
+      : undefined,
+  ].filter((part): part is string => part !== undefined);
+  return parts.join('; ');
+}
+
+/**
+ * D27 item e: the lexical proposal history, next to the accepted settings — each attempt, what was
+ * proposed, and why a refused one was refused (e.g. a marker that "does not appear in the
+ * documentation", D24 a). Only available with `--synthesis`.
+ */
+function renderLexicalProposalHistory(report: Report): string {
+  const attempts = report.synthesis?.lexicalAttempts;
+  if (attempts === undefined) return '_Lexical proposal history unavailable (pass `--synthesis <file>` to `lsc report`)._';
+  if (attempts.length === 0) return '_(no lexical attempts recorded)_';
+  return attempts
+    .map(
+      (a) =>
+        `- attempt ${String(a.attempt)}: **${a.outcome}** — proposed: ${describeLexicalProposal(a.proposal)}` +
+        `${a.problems.length > 0 ? ` — refused because: ${a.problems.join(' | ')}` : ''}`,
+    )
+    .join('\n');
+}
+
 /** Lexical settings (docs/PLAN.md §5.1): comment/string markers and `fileMatchers`, only with `--ruleset` (D25 item 2). */
 function renderLexical(report: Report): string {
-  if (report.lexical === undefined) {
-    return '_Lexical settings unavailable (pass `--ruleset` to `lsc report`)._';
-  }
-  const l = report.lexical;
-  const lines = [
-    `- File matchers: ${l.fileMatchers.map((g) => `\`${g}\``).join(', ')}`,
-    `- Line comment: ${l.lineComment !== undefined ? `\`${l.lineComment}\`` : '_(none)_'}`,
-    `- Block comment: ${l.blockComment !== undefined ? `\`${l.blockComment.start}\` … \`${l.blockComment.end}\`` : '_(none)_'}`,
-    `- String delimiters: ${
-      l.stringDelimiters !== undefined && l.stringDelimiters.length > 0
-        ? l.stringDelimiters.map((d) => `\`${d.start}\` … \`${d.end}\``).join(', ')
-        : '_(none)_'
-    }`,
-  ];
-  return lines.join('\n');
+  const accepted =
+    report.lexical === undefined
+      ? '_Lexical settings unavailable (pass `--ruleset` to `lsc report`)._'
+      : [
+          `- File matchers: ${report.lexical.fileMatchers.map((g) => `\`${g}\``).join(', ')}`,
+          `- Line comment: ${report.lexical.lineComment !== undefined ? `\`${report.lexical.lineComment}\`` : '_(none)_'}`,
+          `- Block comment: ${report.lexical.blockComment !== undefined ? `\`${report.lexical.blockComment.start}\` … \`${report.lexical.blockComment.end}\`` : '_(none)_'}`,
+          `- String delimiters: ${
+            report.lexical.stringDelimiters !== undefined && report.lexical.stringDelimiters.length > 0
+              ? report.lexical.stringDelimiters.map((d) => `\`${d.start}\` … \`${d.end}\``).join(', ')
+              : '_(none)_'
+          }`,
+        ].join('\n');
+  return [
+    accepted,
+    '',
+    '**Proposal history** (D27 item e; from `synthesis.json`, next to the accepted settings above):',
+    '',
+    renderLexicalProposalHistory(report),
+  ].join('\n');
 }
 
 function renderSynthesisAttempts(attempts: readonly SynthesisAttemptView[]): string {
@@ -307,6 +408,8 @@ export function renderMarkdown(report: Report): string {
     '',
     renderCoverage(report),
     '',
+    renderSampleMatchCounts(report),
+    '',
     '## Lexical settings',
     '',
     renderLexical(report),
@@ -325,6 +428,7 @@ export function renderMarkdown(report: Report): string {
     '',
     renderSourceSkills(report),
     renderSkillHashMismatches(report),
+    renderNewSkillFiles(report),
     '',
   ];
   return `${sections.join('\n')}\n`;

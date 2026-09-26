@@ -220,6 +220,134 @@ describe('buildReviewEntry: the reviewer\'s db-read reproduction (order_lines.tl
   });
 });
 
+describe('buildReviewEntry: the G2 round messages.tl reproduction (D27 defect A1, customers/messages.tl:4)', () => {
+  const dbReadRule = () => ruleNamed('db-read');
+  const messagesText = () => sampleText('customers/messages.tl');
+  const ruleSet = loadFixtureRuleSet();
+
+  // customers/messages.tl:
+  //   4   READ inbox WHERE owner = uid AND NOT read   <- two db-read matches: "inbox" (line 4 only),
+  //                                                       and a second, case-insensitive match on the
+  //                                                       trailing "read" that continues across the
+  //                                                       newline to capture "LET" on line 5
+  //   5   LET n = ROWCOUNT()
+
+  it("verdict correct on the first (table=inbox) match extends the span to cover the second match's continuation onto line 5", () => {
+    const item = {
+      ruleId: 'db-read',
+      construct: 'db-read',
+      match: { ruleId: 'db-read', file: 'customers/messages.tl', line: 4, column: 3, captures: { table: 'inbox' }, snippet: [] },
+    };
+    const result = buildReviewEntry(item, dbReadRule(), ruleSet, messagesText(), 'correct', 'review-db-read-101');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.entry.code).toBe('  READ inbox WHERE owner = uid AND NOT read\n  LET n = ROWCOUNT()');
+    expect(result.entry.expected).toEqual([
+      { line: 1, type: 'db_read', captures: { table: 'inbox' } },
+      { line: 1, type: 'db_read', captures: { table: 'LET' } },
+    ]);
+
+    // Round-trips and, replayed against its own rule, passes (the reviewer's exact reproduction:
+    // before the span-extension fix, the entry's `code` was line 4 only and this failed).
+    const loaded = parseReviews(stringifyReviews([result.entry]), 'reviews.yaml');
+    expect(loaded.errors).toEqual([]);
+    const example = loaded.examples[0];
+    expect(example).toBeDefined();
+    if (example === undefined) return;
+    const prepared = prepareFile(ruleSet, example.code);
+    const actual = matchRule(dbReadRule(), prepared);
+    const diff = diffExample(example.expected, actual);
+    expect(diff.passed).toBe(true);
+  });
+
+  it(
+    'recording "correct" for every sample match of the fixture Rule Set and replaying each against its own rule gives 0 failures ' +
+      '(G2 acceptance test, D27 defect A1: the reviewer found 131 of 132 passing before the fix)',
+    () => {
+      const results = runFixture(ruleSet, loadSampleFiles());
+      const ruleById = new Map(ruleSet.rules.map((r) => [r.id, r] as const));
+      const files = new Map(loadSampleFiles().map((f) => [f.path, f.content] as const));
+      const nextId = makeIdGenerator([]);
+
+      let total = 0;
+      const failures: string[] = [];
+
+      for (const ruleResult of results.rules) {
+        const rule = ruleById.get(ruleResult.ruleId);
+        if (rule === undefined) continue;
+        for (const match of ruleResult.sampleMatches) {
+          total += 1;
+          const fileText = files.get(match.file);
+          if (fileText === undefined) {
+            failures.push(`${match.file}:${String(match.line)}: sample file unreadable`);
+            continue;
+          }
+          const item = { ruleId: ruleResult.ruleId, construct: 'acceptance', match };
+          const built = buildReviewEntry(item, rule, ruleSet, fileText, 'correct', nextId('acceptance'));
+          if (!built.ok) {
+            failures.push(`${match.file}:${String(match.line)}: ${built.reason}`);
+            continue;
+          }
+          const loaded = parseReviews(stringifyReviews([built.entry]), 'reviews.yaml');
+          if (loaded.errors.length > 0) {
+            failures.push(`${match.file}:${String(match.line)}: ${loaded.errors.map((e) => e.message).join('; ')}`);
+            continue;
+          }
+          const example = loaded.examples[0];
+          if (example === undefined) {
+            failures.push(`${match.file}:${String(match.line)}: no example loaded back`);
+            continue;
+          }
+          const prepared = prepareFile(ruleSet, example.code);
+          const actual = matchRule(rule, prepared);
+          const diff = diffExample(example.expected, actual);
+          if (!diff.passed) {
+            failures.push(`${match.file}:${String(match.line)}: ${JSON.stringify(diff)}`);
+          }
+        }
+      }
+
+      expect(total).toBeGreaterThan(100);
+      expect(failures).toEqual([]);
+    },
+  );
+});
+
+describe('buildReviewEntry: false_positive refused when ANY other rule matches, not only the same rule (D27 defect A2, D16 h, D19 a)', () => {
+  const ruleSet = loadFixtureRuleSet();
+  // `MODULE demo / PROC p() / READ t WHERE a = b; CALL helper() / ENDPROC` — line 3 has both a
+  // db-read match (table=t) and a call-statement match (callee=helper); reviewing the db-read match
+  // as false_positive must be refused because the line is also matched by call-statement.
+  const code = 'MODULE demo\nPROC p()\n  READ t WHERE a = b; CALL helper()\nENDPROC\n';
+
+  it('refuses a false_positive on db-read at 3:3 because call-statement also matches, naming call-statement in the reason', () => {
+    const dbRead = ruleSet.rules.find((r) => r.id === 'db-read');
+    if (dbRead === undefined) throw new Error('no db-read rule in the fixture');
+    const item = {
+      ruleId: 'db-read',
+      construct: 'db-read',
+      match: { ruleId: 'db-read', file: 'demo.tl', line: 3, column: 3, captures: { table: 't' }, snippet: [] },
+    };
+    const result = buildReviewEntry(item, dbRead, ruleSet, code, 'false_positive', 'review-db-read-201');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toContain('call-statement');
+    expect(result.reason).toContain('D16 h');
+  });
+
+  it('the same match, verdict correct, is not affected (a positive example naming its own construct only)', () => {
+    const dbRead = ruleSet.rules.find((r) => r.id === 'db-read');
+    if (dbRead === undefined) throw new Error('no db-read rule in the fixture');
+    const item = {
+      ruleId: 'db-read',
+      construct: 'db-read',
+      match: { ruleId: 'db-read', file: 'demo.tl', line: 3, column: 3, captures: { table: 't' }, snippet: [] },
+    };
+    const result = buildReviewEntry(item, dbRead, ruleSet, code, 'correct', 'review-db-read-202');
+    expect(result.ok).toBe(true);
+  });
+});
+
 describe('runReviewSession', () => {
   function context() {
     const ruleSet = loadFixtureRuleSet();
