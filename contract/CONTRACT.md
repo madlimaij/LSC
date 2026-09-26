@@ -1,4 +1,4 @@
-# Rule Set contract 1.0.1
+# Rule Set contract 1.0.2
 
 This is the contract between the Language Skill Compiler (`lsc`) and Legacy Navigator's CustomLanguageAdapter. It covers the Rule Set JSON file: what it contains, the rules it must follow, and how a consumer must apply it so that Navigator finds exactly what `lsc` tested.
 
@@ -14,7 +14,7 @@ Fixtures:
 - `contract/fixtures/toylang.ruleset.json`: a valid Rule Set for the synthetic language `toylang`, one or more rules per rule type, both engines.
 - `contract/fixtures/invalid/<rule>--<variant>.json`: each file breaks exactly one validation rule; `<rule>` is the rule code from §5.
 
-Plan references: `docs/PLAN.md` §5 (contract), D1–D4, D6. Decisions made while implementing it: `docs/DECISIONS.md` D11–D14; approval at G1: D16; later changes: D19, D20 (history in §8).
+Plan references: `docs/PLAN.md` §5 (contract), D1–D4, D6. Decisions made while implementing it: `docs/DECISIONS.md` D11–D14; approval at G1: D16; later changes: D19, D20, D21, D22 (history in §8).
 
 ## Contents
 
@@ -47,7 +47,7 @@ that is: JSON path, rule code in brackets (§5), message.
 
 ## 2. Contract version and compatibility
 
-`contractVersion` is the version of the file *format* and of the consumer behaviour this document prescribes (semver). This contract is **1.0.1**.
+`contractVersion` is the version of the file *format* and of the consumer behaviour this document prescribes (semver). This contract is **1.0.2**.
 
 | Change to the format | Bump | Example |
 | --- | --- | --- |
@@ -63,7 +63,7 @@ Consumer policy for a file with contract version `M.m.p`, when the consumer impl
 
 A newer validator accepts older minors of the same major (a 1.2 validator accepts 1.0 and 1.1 files). Pre-release suffixes (`1.0.0-rc.1`) are not accepted in `contractVersion`.
 
-Specifying consumer behaviour for a case this document previously left unspecified (an open question in §9), without changing which files are valid or any behaviour already specified, counts as a clarification: a patch bump. 1.0.1 is such a bump (§8 history, D20). Because a patch never changes acceptance, a consumer that implements 1.0.1 applies the 1.0.1 behaviour to every `1.0.x` file, and a producer must not rely on the `contractVersion` patch level to select consumer behaviour.
+Specifying consumer behaviour for a case this document previously left unspecified (an open question in §9), without changing which files are valid or any behaviour already specified, counts as a clarification: a patch bump. 1.0.1 is such a bump (§8 history, D20). So is replacing a provisional answer that §9 still listed as open with the project owner's decision, as long as validity does not change: 1.0.2 (D21, D22). Because a patch never changes acceptance, a consumer applies the behaviour of the patch level it implements (1.0.2 now) to every `1.0.x` file, and a producer must not rely on the `contractVersion` patch level to select consumer behaviour.
 
 ## 3. Content version (`version`) bump rules
 
@@ -100,7 +100,7 @@ This subsection is normative, like §6. Each applied match (§6.1) is mapped as 
 
 1. **Low confidence.** Every match of a rule with `confidence: "low"` produces an `uncertainties` record, in addition to whatever items 2–4 produce.
 2. **Missing required capture.** A required role (§4) is *missing* when its group did not take part in the match or captured the empty string (§6.5). A match with a missing required role produces an `uncertainties` record and **no** record of its type (no symbol, relation, db access, config ref or entry point). This applies to every rule type (§9 Q3, adopted for 1.0 by D16 f).
-   - For `module_declaration` and `symbol_definition` this means an **unnamed definition**: it produces an `uncertainties` record, no `symbols` record, **opens no scope**, and does not count as a module declaration for item 4 (§6.6, D19 c).
+   - For `module_declaration` and `symbol_definition` this means an **unnamed definition**: it produces an `uncertainties` record, no `symbols` record, is never an enclosing symbol, and does not count as a module declaration for item 4 (D19 c). If its rule has `blockEnd`, it still pairs with its own `blockEnd` match (§6.6, D21).
    - An optional role that is missing is simply absent from the record.
 3. **`symbol_definition` kind.** The Navigator kind is `function` when the `kind` capture is present and, lowercased, starts with `func`; otherwise (no `kind` role mapped, `kind` missing, or any other text) it is `procedure`. This is the 1.0 rule (§9 Q2).
 4. **Source of `relations`, `dbAccesses` and `configRefs`** (D19 b). Every such record has a source, chosen in this order:
@@ -203,12 +203,12 @@ The function `exactToRegex` in `src/contract/exact.ts` produces this regex and i
 
 ### 6.6 Definitions, scopes and `blockEnd` (D4)
 
-- A match of a `module_declaration` or `symbol_definition` rule **that has `blockEnd`** opens a scope named by its `name` capture.
-- An **unnamed definition** (its `name` capture is missing or empty, §6.5) opens no scope, even if its rule has `blockEnd`; it produces an `uncertainties` record (§4.1 item 2, D19 c). Matches after it keep the scope that was innermost before it. Its `blockEnd` match, if any, is processed like any other `blockEnd` match (next item): it closes the most recently opened, still open scope of the same rule, or is ignored with a warning if there is none. (So with nested definitions of one rule, an unnamed inner definition's end closes the outer scope; see §9 Q9.)
-- A match of that rule's `blockEnd` pattern (same masked view as the rule, its own `flags` and `multiline`) closes the most recently opened, still open scope of **the same rule**. A `blockEnd` match with no open scope of that rule is ignored with a warning.
+- A match of a `module_declaration` or `symbol_definition` rule **that has `blockEnd`** opens a scope of that rule. The scope is named by the match's `name` capture.
+- A match of that rule's `blockEnd` pattern (same masked view as the rule, its own `flags` and `multiline`) closes the most recently opened, still open scope of **the same rule** (last in, first out per rule id). A `blockEnd` match with no open scope of that rule is ignored with a warning.
+- An **unnamed definition** (its `name` capture is missing or empty, §6.5) of a rule with `blockEnd` still opens a scope for `blockEnd` pairing, so the pairing above counts it like any other definition of its rule: its own `blockEnd` closes it, and a `blockEnd` never skips it to close an older scope of the same rule. But that scope is **anonymous**: it is never an enclosing symbol and never a fallback source (§4.1 items 2 and 4). A match inside it gets the enclosing symbol it would have had without it, which is the innermost *named* scope open at its start position. The definition itself produces an `uncertainties` record and no `symbols` record (§4.1 item 2, D19 c, D21). Example with one rule `PROC … ENDPROC` whose name is optional: in `PROC outer` / `PROC` / `ENDPROC` / `CALL after()` / `ENDPROC`, the first `ENDPROC` closes the unnamed scope, and `after` is still enclosed by `outer`.
 - Matches are processed in order of their start position in the file; at the same position, `blockEnd` matches are processed before rule matches.
-- Every match gets as enclosing symbol the innermost scope open at its start position (any rule). A definition does not enclose itself. A match with no open scope has no enclosing symbol; for `relations`, `dbAccesses` and `configRefs` the source then falls back to the last named module declaration before it, or the file (§4.1 item 4, D19 b).
-- Scopes still open at end of file are closed there, with a warning, not an error.
+- Every match gets as enclosing symbol the innermost named scope open at its start position (any rule; anonymous scopes are skipped). A definition does not enclose itself. A match with no open scope has no enclosing symbol; for `relations`, `dbAccesses` and `configRefs` the source then falls back to the last named module declaration before it, or the file (§4.1 item 4, D19 b).
+- Scopes still open at end of file, named or anonymous, are closed there, with a warning, not an error.
 - A definition rule without `blockEnd` opens no scope (§9 Q5). A `module_declaration` without `blockEnd` still acts as the fallback source of §4.1 item 4.
 
 ## 7. Field reference
@@ -264,6 +264,7 @@ History:
 | --- | --- | --- | --- |
 | 1.0.0 | 2026-09-25 | Approved and frozen at G1 | D16 |
 | 1.0.1 | 2026-09-26 | Patch (clarification, §2): §4.1 mapping rules written out — missing required captures (Q3 proposal), `symbol_definition` kind (Q2), unnamed definitions open no scope (D19 c), fallback source for matches outside any scope (D19 b); §6.5/§6.6 aligned. File format, schema structure and validity unchanged. | D19, D20 |
+| 1.0.2 | 2026-09-26 | Patch (owner decision on a question §9 listed as open, §2): an unnamed definition of a rule with `blockEnd` opens an anonymous scope. Its own `blockEnd` closes it (LIFO per rule), but it is never an enclosing symbol or fallback source (§4.1 item 2, §6.6, §9 Q9 b). Replaces the 1.0.1 text, under which its `blockEnd` closed the most recent open scope of the same rule. Matches the reference engine. File format, schema structure and validity unchanged. | D21, D22 |
 
 ## 9. Open questions
 
@@ -271,10 +272,10 @@ To be answered by the project owner (G1) or from real-language evidence (Wave 5)
 
 - **Q1 — Exact engine placeholders (D11).** The plan gives the exact engine only `tokens` and `caseSensitive`, yet every rule type requires a capture. Without a capture mechanism no exact rule could ever be valid. Contract 1.0 adds placeholder tokens `(?<name>)` matching `[0-9A-Za-z_]+`. If the real language's identifiers contain other characters (`.`, `-`, `$`, `#`), rules for them must use the regex engine.
 - **Q2 — `symbol_definition` kind.** *1.0 rule (D16 f, as implemented in WP-04):* `kind` capture, lowercased, starting with `func` → `function`, else `procedure` (§4.1 item 3). **Still open for G4:** whether the real language needs a per-language mapping instead (a new optional field would be a minor bump).
-- **Q3 — Missing or ambiguous captures.** *Resolved (D16 f, D19 c):* a missing or empty required capture produces an `uncertainties` record and no record of its type; an unnamed definition also opens no scope (§4.1 item 2, §6.6). **Still open for G4:** whether any other situation counts as "ambiguous captures" (plan §5.3); 1.0 defines none.
+- **Q3 — Missing or ambiguous captures.** *Resolved (D16 f, D19 c):* a missing or empty required capture produces an `uncertainties` record and no record of its type; an unnamed definition is never an enclosing symbol but still pairs with its own `blockEnd` (§4.1 item 2, §6.6, D21). **Still open for G4:** whether any other situation counts as "ambiguous captures" (plan §5.3); 1.0 defines none.
 - **Q4 — Escapes in string literals.** 1.0 has none (a string ends at the first `end` delimiter). If the real language escapes quotes (`\"` or `""`), an optional `escape` field on the delimiter pair would be a minor bump.
 - **Q5 — Definitions without `blockEnd`.** *Resolved (D19 b):* they still open no scope. Instead, a relation, db-access or config-ref match with no open scope takes as source the last named `module_declaration` before it in the file, or the file itself (§4.1 item 4). **Still open for G4:** nothing beyond checking this against the real language.
 - **Q6 — Several comment markers.** `lineComment` and `blockComment` are single values, as in the plan. A language with two line-comment markers would need them as arrays: a major bump if replaced, a minor bump if added as new optional fields.
 - **Q7 — Source file encoding.** The contract assumes text decoded as UTF-8. Legacy code may be Latin-1 or another code page; if so, a top-level `encoding` field is a minor bump.
 - **Q8 — Newer minor versions.** §2 makes a consumer reject newer minors. The alternative is to let it skip unknown rule types and fields, which requires open (non-strict) objects and weakens typo detection.
-- **Q9 — Matches outside any open scope (WP-04 question).** *Resolved (D19 b):* they produce normal records with the fallback source of §4.1 item 4, never a `missing-source-symbol` uncertainty. Details fixed by `contract-architect` in D20 where D19 was silent, to be confirmed by the project owner: only *named* module declarations count as fallback source; the file is identified by its repository-relative path. **Still open:** (a) how Navigator distinguishes a file source from a symbol name in its records (Navigator's record shape, outside this contract); (b) an unnamed definition's `blockEnd` closes the most recent open scope of the same rule, which with nested same-rule definitions ends the outer scope early (§6.6). The alternative, an anonymous scope that consumes the `blockEnd` but is transparent as enclosing symbol, contradicts "opens no scope" and was not adopted.
+- **Q9 — Matches outside any open scope (WP-04 question).** *Resolved (D19 b):* they produce normal records with the fallback source of §4.1 item 4, never a `missing-source-symbol` uncertainty. Details fixed by `contract-architect` in D20 where D19 was silent, to be confirmed by the project owner: only *named* module declarations count as fallback source; the file is identified by its repository-relative path. *Resolved in 1.0.2 (D21):* an unnamed definition of a rule with `blockEnd` opens an anonymous scope. The scope takes part in same-rule `blockEnd` pairing (its own `blockEnd` closes it), but it is never an enclosing symbol or fallback source (§6.6). The 1.0.1 text, under which its `blockEnd` closed the most recent open scope of the same rule, is withdrawn: with nested same-rule definitions it ended the outer scope early and misattributed the matches after it. **Still open:** how Navigator tells a file source from a symbol name in its records (Navigator's record shape, outside this contract).

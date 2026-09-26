@@ -40,7 +40,7 @@ async function runCli(...args: string[]): Promise<number> {
 describe('lsc validate-ruleset', () => {
   it('reports a valid Rule Set with exit code 0', async () => {
     expect(await runCli(VALID_FIXTURE)).toBe(0);
-    expect(out.join('')).toMatch(/^OK: .*toylang\.ruleset\.json is a valid Rule Set \(contract 1\.0\.1, 8 rules\)\n$/);
+    expect(out.join('')).toMatch(/^OK: .*toylang\.ruleset\.json is a valid Rule Set \(contract 1\.0\.2, 8 rules\)\n$/);
     expect(err).toEqual([]);
   });
 
@@ -59,7 +59,7 @@ describe('lsc validate-ruleset', () => {
     expect(JSON.parse(out.join(''))).toEqual({
       valid: false,
       file,
-      contractVersion: '1.0.1',
+      contractVersion: '1.0.2',
       issues: [
         {
           rule: 'duplicate-rule-id',
