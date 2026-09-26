@@ -9,9 +9,9 @@
 | WP-04 | Rule engines | engine-builder | WP-02, WP-03 | done (reviewed wave 2, round 3; last fix verified by orchestrator) |
 | WP-05 | Test runner | engine-builder | WP-04 | done (reviewed wave 2, round 3) |
 | WP-06 | Skill ingestion | skill-ingester | WP-03 | done (reviewed wave 2, round 3) |
-| WP-07 | Report + review CLI | report-builder | WP-05 | done (awaiting wave 3 review) |
+| WP-07 | Report + review CLI | report-builder | WP-05 | review: changes required + D25 additions (in progress) |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
-| WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | done except real-provider run (awaiting wave 3 review) |
+| WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | review: compile must write report (after WP-07 fix); real run deferred to G4 (D25) |
 | WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | not started |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
 | WP-12 | Extra engines (conditional) | engine-builder | WP-11 | not started |

@@ -173,3 +173,16 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
   g. The draft Rule Set `version` is `0.0.0-draft`; WP-10 assigns the real one.
 - **Reason:** The plan gives no source for the lexical fields; the runner's pass/fail semantics; D8; D16 g; honest partial output.
 - **Affects:** WP-07, WP-10, G4.
+
+## D25 — Wave 3 review outcome: real run deferred, report extended before G2
+
+- **Date:** 2026-09-26
+- **Author:** orchestrator, recording the project owner's answers and orchestrator rulings
+- **Decision:**
+  1. **Owner:** WP-09 acceptance criterion 5 (manual real-provider run on toylang) is deferred to G4. The first real-provider run happens with the provider approved at G4, on toylang first, before any real-language input. G2 judges the report format using the hand-written replay, which must be labelled as such.
+  2. **Owner:** before G2, `lsc compile` writes the report itself (Markdown and HTML) into `--out`. The report also shows: the lexical settings (comment and string markers, `fileMatchers`); each construct's outcome and reasons from `synthesis.json` (e.g. not justified, rejected, attempts); the provider, model and recording origin (hand-written or recorded); and the number of unreviewed sample matches in the verdict line.
+  3. **Orchestrator ruling:** the WP-07 layout that puts unreviewed sample matches and provenance inside each rule section (instead of separate sections after the rules) is accepted as a recorded deviation; the global Provenance section keeps the Skill file hashes.
+  4. **Orchestrator ruling (reviewer Q5):** `lsc report --skills-dir` warns when the current Skill file hashes differ from the Rule Set's `sourceSkills`.
+  5. **For WP-10 (reviewer Q2):** export must drop `status: "rejected"` rules, and a draft Rule Set (`0.0.0-draft`) must never be delivered to Navigator.
+- **Reason:** Owner answers after the wave 3 review; the reviewer judged the report sufficient for "do the rules pass their examples" but not yet for "should this Rule Set be trusted".
+- **Affects:** WP-07, WP-09, WP-10, G2, G4. Still open for G4: reviewer Q1 (single-character markers pass the verbatim check trivially), Q3 (one rule per construct vs. constructs with several forms).
