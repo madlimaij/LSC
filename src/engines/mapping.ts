@@ -134,13 +134,44 @@ function isBlank(value: string | undefined): boolean {
 export function mapMatches(matches: readonly Match[], rules: readonly Rule[], file: string): NavigatorAnalysis {
   const ruleById = new Map(rules.map((rule) => [rule.id, rule] as const));
   const out = emptyAnalysis();
-  // Last *named* module_declaration match seen so far, in file order (§4.1 item 4, §6.6):
-  // used regardless of that rule's blockEnd or whether its scope is still open. Tracked with its
-  // own start position so a later match only takes it as fallback source when the module
-  // declaration's start position is strictly earlier (§4.1 item 4 "before the match's start
-  // position"): a module_declaration at the same (line, column) as the match it would otherwise
-  // source is not "before" it.
-  let lastModule: { readonly name: string; readonly line: number; readonly column: number } | undefined;
+
+  // Every named module_declaration match (§4.1 item 4, §6.6), sorted by start position
+  // (ascending, stable so equal-position entries keep their original array order). Collected up
+  // front, over the whole `matches` array, so that the fallback source for a given relation,
+  // db-access or config-ref match does not depend on where that match sits in the array relative
+  // to a module_declaration match at (or after) the same position: only *position* decides which
+  // module_declaration matches are eligible (strictly before the match's start position), never
+  // array order. An unnamed module_declaration (a blank `name` capture) is excluded, same as
+  // `missingRequired` treats it elsewhere (§4.1 item 2).
+  const namedModules: { readonly name: string; readonly line: number; readonly column: number }[] = [];
+  for (const match of matches) {
+    if (match.type !== 'module_declaration') continue;
+    const rule = ruleById.get(match.ruleId);
+    if (rule === undefined) continue;
+    const spec = RULE_TYPE_SPEC[match.type];
+    const missingRequired = spec.requiredRoles.some((role) => isBlank(match.captures[role]));
+    if (missingRequired) continue;
+    namedModules.push({ name: required(match.captures.name, 'name'), line: match.line, column: match.column });
+  }
+  namedModules.sort((a, b) => a.line - b.line || a.column - b.column);
+
+  // Last named module_declaration match whose start position is strictly before (line, column)
+  // (§4.1 item 4 "before the match's start position"): a module_declaration at the same (line,
+  // column) as the match it would otherwise source is not "before" it. Binary search for the
+  // first entry whose position is not-before (line, column); the entry just before that, if any,
+  // is the answer.
+  function lastModuleBefore(line: number, column: number): string | undefined {
+    let lo = 0;
+    let hi = namedModules.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      const candidate = namedModules.at(mid);
+      const isBefore = candidate !== undefined && (candidate.line < line || (candidate.line === line && candidate.column < column));
+      if (isBefore) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo > 0 ? namedModules.at(lo - 1)?.name : undefined;
+  }
 
   for (const match of matches) {
     const rule = ruleById.get(match.ruleId);
@@ -170,14 +201,7 @@ export function mapMatches(matches: readonly Match[], rules: readonly Rule[], fi
       continue;
     }
 
-    // A blank name would already have been caught by `missingRequired` above (§4.1 item 2), so
-    // `captures.name` is always present and non-empty here.
-    if (match.type === 'module_declaration') {
-      lastModule = { name: required(match.captures.name, 'name'), line: match.line, column: match.column };
-    }
-
-    const isBeforeMatch = lastModule !== undefined && (lastModule.line < match.line || (lastModule.line === match.line && lastModule.column < match.column));
-    const fallbackModuleName = isBeforeMatch ? lastModule?.name : undefined;
+    const fallbackModuleName = lastModuleBefore(match.line, match.column);
     const source = RECORDS_NEEDING_SOURCE.has(spec.navigatorRecord) ? (match.enclosingSymbol ?? fallbackModuleName ?? file) : undefined;
     pushRecord(out, match, source);
   }

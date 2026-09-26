@@ -6,12 +6,12 @@
 | WP-01 | Skeleton and tooling | contract-architect | — | done (reviewed wave 1) |
 | WP-02 | Rule Set contract | contract-architect | WP-01 | done (reviewed wave 1) |
 | WP-03 | Example format + toylang | contract-architect | WP-02 | done (reviewed wave 1) |
-| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | round 3: one finding (fallback source), fix in progress |
+| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | done (reviewed wave 2, round 3; last fix verified by orchestrator) |
 | WP-05 | Test runner | engine-builder | WP-04 | done (reviewed wave 2, round 3) |
 | WP-06 | Skill ingestion | skill-ingester | WP-03 | done (reviewed wave 2, round 3) |
-| WP-07 | Report + review CLI | report-builder | WP-05 | not started |
+| WP-07 | Report + review CLI | report-builder | WP-05 | in progress |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
-| WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | not started |
+| WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | in progress |
 | WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | not started |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
 | WP-12 | Extra engines (conditional) | engine-builder | WP-11 | not started |
@@ -278,3 +278,11 @@ Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 - Checks: `npm run typecheck` and `npm run lint` clean; `npm test` 46 files, 479 tests (orchestrator re-ran).
 
 **Deviations:** None. The CLI's per-rule PASS/FAIL label duplicates the runner's `ok` logic. It is covered by the `FAIL  call-statement` assertion, but removing only the CLI copy was not tested separately.
+
+### WP-04 fallback-source fix (`engine-builder`, 2026-09-26)
+
+*(Appended by the orchestrator. This follows the round-3 targeted review, which found one bug. The orchestrator verified the fix itself rather than running a fourth reviewer round; the full reviewer pass after Wave 3 covers it.)*
+
+- **Finding:** `mapMatches` kept only the latest named module, so a module at the same position as a match overwrote an earlier valid one (CONTRACT.md §4.1 item 4). **Fixed** in `src/engines/mapping.ts`: named modules are collected, sorted by (line, column), and `lastModuleBefore` finds the last one strictly before the match, independent of array order.
+- **Evidence:** `tests/engines/mapping.test.ts` covers the reviewer's reproduction (`module a` (1,1), `module b` (3,5), `call x` (3,5) → source `a`), in array order and with the call placed before `module b`. The same-position test with no earlier module still expects the file path. `npm run typecheck` and `npm run lint` clean; `npm test` 46 files, 480 tests (orchestrator re-ran).
+- **Open (for `contract-architect`, next contract update, non-blocking):** CONTRACT.md §4.1 item 4 and §6.6 say "scope" where "named scope" is meant. The engine already follows the intended meaning.

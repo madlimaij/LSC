@@ -247,6 +247,44 @@ describe('Match → Navigator mapping (contract/CONTRACT.md §4)', () => {
     ]);
   });
 
+  it('picks the last named module_declaration strictly before the match, not overwritten by a later module_declaration at (or after) the match\'s position, regardless of array order (§4.1 item 4)', () => {
+    const moduleRule: Rule = {
+      id: 'module-declaration',
+      type: 'module_declaration',
+      engine: 'exact',
+      exact: { tokens: ['MODULE', '(?<name>)'], caseSensitive: false },
+      captures: { name: 'name' },
+      confidence: 'high',
+      ...identity,
+    };
+
+    // module a (1,1); module b (3,5); call x (3,5) -- module b is not "before" the call (same
+    // position), so the call's fallback source must be the earlier module, "a", not the file.
+    const inOrder = mapMatches(
+      [
+        match({ ruleId: 'module-declaration', type: 'module_declaration', line: 1, column: 1, captures: { name: 'a' } }),
+        match({ ruleId: 'module-declaration', type: 'module_declaration', line: 3, column: 5, captures: { name: 'b' } }),
+        match({ line: 3, column: 5, captures: { callee: 'x' } }),
+      ],
+      [moduleRule, callRule()],
+      'f.tl',
+    );
+    expect(inOrder.relations).toEqual([{ kind: 'calls', source: 'a', callee: 'x', line: 3, ruleId: 'call-statement' }]);
+
+    // Same positions, but the call comes before "module b" in the matches array: the result must
+    // not depend on the order of matches at the same position.
+    const callFirst = mapMatches(
+      [
+        match({ ruleId: 'module-declaration', type: 'module_declaration', line: 1, column: 1, captures: { name: 'a' } }),
+        match({ line: 3, column: 5, captures: { callee: 'x' } }),
+        match({ ruleId: 'module-declaration', type: 'module_declaration', line: 3, column: 5, captures: { name: 'b' } }),
+      ],
+      [moduleRule, callRule()],
+      'f.tl',
+    );
+    expect(callFirst.relations).toEqual([{ kind: 'calls', source: 'a', callee: 'x', line: 3, ruleId: 'call-statement' }]);
+  });
+
   it('an empty optional "module" capture on a call is left out of the record, same as absent (§4.1 item 2, §6.5)', () => {
     const analysis = mapMatches(
       [match({ captures: { callee: 'x', module: '' }, enclosingSymbol: 's' })],
