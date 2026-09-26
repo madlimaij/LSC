@@ -145,3 +145,16 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
   2. **Version: patch bump, 1.0.1 → 1.0.2.** `CONTRACT_VERSION` bumped, `contract/rule-set.schema.json` re-exported (only `$id`, `title` and the `contractVersion` description change; the pattern still accepts `1.0.x`), contract tests updated, §8 history row added. §2 now also names "replacing a provisional answer that §9 still listed as open with the owner's decision" as a patch.
 - **Reason:** No file becomes valid or invalid, and no field, rule type or engine changes, so this is not a minor bump. It is not a major bump either, although 1.0.1 text is reversed. (1) D20 and 1.0.1 §9 Q9 b listed exactly this point as still open, pending owner confirmation. (2) The reference engine never implemented the 1.0.1 text, so every `lsc test` result so far was measured with the 1.0.2 behaviour. (3) No Rule Set has been exported under 1.0.1 (WP-10 has not run), and Navigator has not implemented 1.0.1 as far as this project records. A major bump would make every 1.0 consumer reject files whose format has not changed. Caveat: strictly, §2's patch rule says "without changing any behaviour already specified", and 1.0.1 did specify this case. The patch stands on the case being provisional (open in §9). If Navigator had already implemented the 1.0.1 text, it must change. The owner may overrule and require a stricter reading.
 - **Affects:** Navigator (implement §6.6 as in 1.0.2; tell it with the new schema file, §8 item 5); WP-10 (export stamps 1.0.2); `engine-builder` (the header comment of src/engines/blocks.ts still describes the 1.0.1 text and should be corrected; the code is right).
+
+## D23 — Contract 1.0.1/1.0.2 details accepted; wave 2 round 3 authorised
+
+- **Date:** 2026-09-26
+- **Author:** orchestrator, with authority delegated by the project owner ("choose what you think is best")
+- **Decision:**
+  1. The §2 rewording made with 1.0.1 is accepted: `contractVersion` also covers consumer behaviour, and specifying a case the contract left open is a patch.
+  2. The D21 correction ships as patch 1.0.2, not a major bump (reasons in D22: no Rule Set was exported under 1.0.1, and the engine never implemented the 1.0.1 text).
+  3. Only named `module_declaration` matches count as the fallback source (D20).
+  4. A file used as the fallback source is identified by its repository-relative path with `/` separators (D20).
+  5. The owner authorised a third, targeted fix-and-review round for WP-04, WP-05 and WP-06, beyond the two-round limit in docs/ORCHESTRATION.md §5.
+- **Reason:** 1–2: a major bump would make every 1.0 consumer reject files whose format has not changed. 3: an unnamed module has no name to give. 4: a path is stable and unique within a repository. 5: the remaining round-2 findings are small, and the contract already settles each one.
+- **Affects:** Navigator needs contract 1.0.2 and the new schema file before any Rule Set ships (CONTRACT.md §8 item 5; to be raised at G2).
