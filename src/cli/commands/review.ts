@@ -15,9 +15,11 @@
  * drives (`runReviewSession`, src/report/review-session.ts) is plain
  * functions, so it is unit-tested without mocking a terminal.
  */
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import type { Command } from 'commander';
+import { loadRuleSetFile } from '../../contract/load.js';
 import { exampleLocations, loadReviews, stringifyReviews } from '../../examples/index.js';
 import { loadResultsFile } from '../../report/load-results.js';
 import { collectUnreviewedMatches, runReviewSession, type UnreviewedMatch } from '../../report/review-session.js';
@@ -28,12 +30,32 @@ export const description = 'Step through unreviewed sample matches and record ve
 interface Options {
   readonly skillsDir?: string;
   readonly reviewsFile?: string;
+  readonly ruleset?: string;
+  readonly sample?: string;
 }
 
 function resolveReviewsFile(options: Options): string {
   if (options.reviewsFile !== undefined) return options.reviewsFile;
   if (options.skillsDir !== undefined) return exampleLocations(options.skillsDir).reviewsFile;
   throw new Error('pass --skills-dir (the usual convention, D15) or --reviews-file so lsc review knows where to write reviews.yaml');
+}
+
+/**
+ * Reads a sample file's raw text by its repository-relative path
+ * (`SampleMatch.file`, `/` separators), resolved against `--sample <dir>`.
+ * `buildReviewEntry` needs the actual text to recompute a match's line span
+ * and check for other same-rule matches on those lines (src/report/match-span.ts,
+ * src/examples/README.md §4); the ±3-line snippet already in `results.json`
+ * is not always enough (a multiline match can span more than that).
+ */
+function makeSampleFileReader(sampleDir: string): (file: string) => string | undefined {
+  return (file: string): string | undefined => {
+    try {
+      return readFileSync(join(sampleDir, ...file.split('/')), 'utf8');
+    } catch {
+      return undefined;
+    }
+  };
 }
 
 function printMatch(item: UnreviewedMatch, index: number, total: number): void {
@@ -50,6 +72,8 @@ export function configure(cmd: Command): void {
     .argument('<results>', 'Results JSON file (written by `lsc test` or `lsc compile`)')
     .option('--skills-dir <dir>', "Skill directory (reviews.yaml is written to its sibling, D15's convention)")
     .option('--reviews-file <file>', 'write to this reviews.yaml path instead of deriving it from --skills-dir')
+    .option('--ruleset <file>', "the Rule Set the sample scan ran with (needed to recompute a match's line span, src/report/match-span.ts)")
+    .option('--sample <dir>', 'the repository sample directory the scan ran against (same one passed to `lsc test`/`lsc compile`)')
     .action(async (resultsPath: string, options: Options) => {
       let reviewsFile: string;
       try {
@@ -60,10 +84,26 @@ export function configure(cmd: Command): void {
         return;
       }
 
+      if (options.ruleset === undefined || options.sample === undefined) {
+        process.exitCode = 1;
+        process.stderr.write(
+          'ERROR: pass --ruleset <file> and --sample <dir> (the same Rule Set and repository sample the results were produced from) ' +
+            "so lsc review can recompute a match's line span and check for other same-rule matches on it (src/examples/README.md §4)\n",
+        );
+        return;
+      }
+
       const loadedResults = loadResultsFile(resultsPath);
       if (!loadedResults.ok) {
         process.exitCode = 1;
         process.stderr.write(`ERROR: ${loadedResults.error}\n`);
+        return;
+      }
+
+      const loadedRuleSet = loadRuleSetFile(options.ruleset);
+      if (!loadedRuleSet.ok) {
+        process.exitCode = 1;
+        process.stderr.write(`ERROR: ${options.ruleset} is not a valid Rule Set\n`);
         return;
       }
 
@@ -82,21 +122,28 @@ export function configure(cmd: Command): void {
         return;
       }
 
+      const readSampleFile = makeSampleFileReader(options.sample);
+
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       let result;
       try {
-        result = await runReviewSession(loadedResults.results, existing.entries, {
-          ask: async (item, index, total) => {
-            printMatch(item, index, total);
-            return rl.question('  verdict [c]orrect / [f]alse positive / [s]kip / [q]uit > ');
+        result = await runReviewSession(
+          loadedResults.results,
+          existing.entries,
+          { ruleSet: loadedRuleSet.ruleSet, readSampleFile },
+          {
+            ask: async (item, index, total) => {
+              printMatch(item, index, total);
+              return rl.question('  verdict [c]orrect / [f]alse positive / [s]kip / [q]uit > ');
+            },
+            onRecorded: (entries) => {
+              writeFileSync(reviewsFile, stringifyReviews(entries));
+            },
+            onSkipped: (_item, reason) => {
+              process.stdout.write(`  skipped: ${reason}\n`);
+            },
           },
-          onRecorded: (entries) => {
-            writeFileSync(reviewsFile, stringifyReviews(entries));
-          },
-          onSkipped: (_item, reason) => {
-            process.stdout.write(`  skipped: ${reason}\n`);
-          },
-        });
+        );
       } finally {
         rl.close();
       }

@@ -5,7 +5,7 @@
  * never have to recompute confidence reasons, coverage status or example
  * locations themselves.
  */
-import type { Confidence, RuleType } from '../contract/index.js';
+import type { Confidence, DelimiterPair, RuleType } from '../contract/index.js';
 import type { ExpectedMatch } from '../examples/index.js';
 import type { CoverageConstruct, MatchSummary, SampleMatch, SampleWarning, WrongCapture } from '../runner/index.js';
 
@@ -104,6 +104,60 @@ export interface OverallVerdict {
   readonly lowConfidenceRuleCount: number;
   readonly rejectedRuleCount: number;
   readonly constructsWithoutUsableRule: readonly string[];
+  /** Sum of every rule's `sampleMatches.length` (D25 item 2: shown in the verdict line, e.g. "138 sample matches not yet reviewed"). */
+  readonly unreviewedSampleMatchCount: number;
+}
+
+/** The Rule Set's language-wide lexical settings (docs/PLAN.md §5.1), shown so a reader does not have to open the Rule Set JSON (D25 item 2). Only present with `--ruleset`. */
+export interface LexicalSettingsView {
+  readonly fileMatchers: readonly string[];
+  readonly lineComment?: string;
+  readonly blockComment?: DelimiterPair;
+  readonly stringDelimiters?: readonly DelimiterPair[];
+}
+
+/** One `synthesis.json` attempt, with review-example capture text withheld (plan §8: no repository sample ever reaches a report the way it reaches a model prompt; see `redactReviewProblem`). */
+export interface SynthesisAttemptView {
+  readonly attempt: number;
+  readonly outcome: string;
+  readonly problems: readonly string[];
+}
+
+export interface SynthesisConstructView {
+  readonly constructId: string;
+  readonly ruleType?: RuleType;
+  readonly status: string;
+  readonly reason?: string;
+  readonly ruleId?: string;
+  readonly attemptCount: number;
+  readonly attempts: readonly SynthesisAttemptView[];
+}
+
+export interface SynthesisUsageView {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly calls: number;
+}
+
+/** What `synthesis.json` (WP-09, src/synth/synthesis-schema.ts) says about how the draft Rule Set was produced (D25 item 2). Only present with `--synthesis`. */
+export interface SynthesisView {
+  readonly status: string;
+  readonly error?: string;
+  readonly lexicalStatus: string;
+  readonly lexicalReason?: string;
+  readonly constructs: readonly SynthesisConstructView[];
+  readonly summary: { readonly constructs: number; readonly validated: number; readonly rejected: number; readonly notJustified: number; readonly skipped: number; readonly notAttempted: number };
+  readonly usage: SynthesisUsageView;
+  /** Always present: `synthesis.json` (src/synth/synthesis-schema.ts) has no `provider`/`model`/recording-origin field as of WP-09 (see this package's WP-07 completion note); this says so instead of silently omitting the section. */
+  readonly providerNote: string;
+}
+
+/** One Skill file whose hash in the Rule Set's `sourceSkills` no longer matches the file at `--skills-dir` (or is missing there), reviewer Q5 / D25 item 4. */
+export interface SkillHashMismatch {
+  readonly path: string;
+  readonly ruleSetSha256: string;
+  /** `undefined` when the file is no longer at that path under `--skills-dir`. */
+  readonly currentSha256?: string;
 }
 
 export interface Report {
@@ -117,4 +171,10 @@ export interface Report {
   readonly rules: readonly RuleReport[];
   readonly sampleWarnings: readonly SampleWarning[];
   readonly sourceSkills?: readonly { readonly path: string; readonly sha256: string }[];
+  /** Only present with `--ruleset`. */
+  readonly lexical?: LexicalSettingsView;
+  /** Only present with `--synthesis`. */
+  readonly synthesis?: SynthesisView;
+  /** Only present with both `--ruleset` and `--skills-dir`; empty when every hash still matches. */
+  readonly skillHashMismatches?: readonly SkillHashMismatch[];
 }

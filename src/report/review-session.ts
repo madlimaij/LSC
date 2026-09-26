@@ -5,8 +5,11 @@
  * it a fixed sequence of answers, and reused unchanged by the interactive
  * CLI (`src/cli/commands/review.ts`).
  */
+import type { Rule, RuleSet } from '../contract/index.js';
+import type { CommentStringConfig } from '../engines/index.js';
 import type { ReviewEntry, ReviewVerdict } from '../examples/index.js';
 import type { Results, RuleResult, SampleMatch } from '../runner/index.js';
+import { computeMatchSpan } from './match-span.js';
 
 export interface UnreviewedMatch {
   readonly ruleId: string;
@@ -68,23 +71,58 @@ export interface BuildReviewEntryOptions {
   readonly now?: () => string;
 }
 
+export type BuildReviewEntryResult = { readonly ok: true; readonly entry: ReviewEntry } | { readonly ok: false; readonly reason: string };
+
+function captureKey(captures: Readonly<Record<string, string | undefined>>): string {
+  return JSON.stringify(Object.entries(captures).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+}
+
 /**
  * Turns one decided sample match into a `reviews.yaml` entry (D9, D15,
- * src/examples/README.md "reviews.yaml"). `code` is the single matched
- * line, the README's recommended choice: it contains the reviewed match
- * and nothing else that could make the example fail for an unrelated
- * reason. `verdict: correct` records the match's own captures as the
- * expected match; a reviewer who disagrees with a capture should choose
- * `false positive` instead (or edit `reviews.yaml` afterwards).
+ * src/examples/README.md §4). `code` is the lines the match *spans*
+ * (`computeMatchSpan`, src/report/match-span.ts) — usually one line, but a
+ * whole-text rule can match text continued onto a later line (db-read's
+ * trap T8). Other matches of the same rule on those lines are handled per
+ * README §4: for `correct`, every one of them (including this one) is
+ * listed in `expected`, sorted by line then capture; for `false_positive`,
+ * any *other* match of the same rule on those lines makes the example
+ * impossible to write as a negative (D16 h: "a negative example must
+ * contain no match of any construct"), so this refuses rather than writing
+ * an entry that a correct rule would then fail.
  */
 export function buildReviewEntry(
   item: UnreviewedMatch,
-  ruleType: RuleResult['type'],
+  rule: Rule,
+  maskingConfig: CommentStringConfig,
+  fileText: string,
   verdict: ReviewVerdict,
   id: string,
   options: BuildReviewEntryOptions = {},
-): ReviewEntry {
-  const code = matchedLineText(item.match);
+): BuildReviewEntryResult {
+  const found = computeMatchSpan(rule, maskingConfig, fileText, item.match.line, item.match.column);
+  if (found === undefined) {
+    return {
+      ok: false,
+      reason: `rule "${rule.id}" no longer matches ${item.match.file}:${String(item.match.line)}:${String(item.match.column)} — has the sample file or the Rule Set changed since this match was recorded?`,
+    };
+  }
+  const { span, sameRuleMatches } = found;
+  const isSelf = (m: { line: number; column: number }): boolean => m.line === item.match.line && m.column === item.match.column;
+  const others = sameRuleMatches.filter((m) => !isSelf(m));
+
+  if (verdict === 'false_positive' && others.length > 0) {
+    const where = others.map((m) => `${String(m.line)}:${String(m.column)}`).join(', ');
+    return {
+      ok: false,
+      reason:
+        `line${span.startLine === span.endLine ? ` ${String(span.startLine)}` : `s ${String(span.startLine)}-${String(span.endLine)}`} ` +
+        `of ${item.match.file} also matched by rule "${rule.id}" at ${where}; a negative example must contain no match of any ` +
+        `construct (src/examples/README.md §4, D16 h) — review those matches too, or edit reviews.yaml by hand to narrow the snippet`,
+    };
+  }
+
+  const lines = fileText.replace(/\r\n/g, '\n').split('\n');
+  const code = lines.slice(span.startLine - 1, span.endLine).join('\n');
   const base = {
     id,
     construct: item.construct,
@@ -96,10 +134,14 @@ export function buildReviewEntry(
     ...(options.now !== undefined ? { reviewedAt: options.now() } : {}),
     ...(options.note !== undefined ? { note: options.note } : {}),
   };
+
   if (verdict === 'correct') {
-    return { ...base, expected: [{ line: 1, type: ruleType, captures: item.match.captures }] };
+    const expected = [...sameRuleMatches]
+      .sort((a, b) => a.line - b.line || captureKey(a.captures).localeCompare(captureKey(b.captures)))
+      .map((m) => ({ line: m.line - span.startLine + 1, type: rule.type, captures: m.captures }));
+    return { ok: true, entry: { ...base, expected } };
   }
-  return base;
+  return { ok: true, entry: base };
 }
 
 /** One answer to a review prompt, parsed from free text (accepts the letter or the full word). */
@@ -134,20 +176,31 @@ export interface ReviewSessionOptions {
   readonly now?: () => string;
 }
 
+export interface ReviewSessionContext {
+  /** The Rule Set the sample scan ran with (gives each rule's pattern/masking, needed to recompute a match's span, src/report/match-span.ts). */
+  readonly ruleSet: RuleSet;
+  /** Reads a sample file's raw text by its repository-relative path (`SampleMatch.file`); `undefined` if it cannot be read. */
+  readonly readSampleFile: (file: string) => string | undefined;
+}
+
 /**
  * Drives one review session end to end: asks about every unreviewed sample
  * match in `results` (via `callbacks.ask`) and turns each answer into a
- * `reviews.yaml` entry. Free of terminal I/O, so `src/cli/commands/review.ts`
- * supplies a `readline`-backed `ask` and tests supply a scripted one.
+ * `reviews.yaml` entry via `buildReviewEntry` (which needs `context` to
+ * recompute the match's line span and check for other same-rule matches on
+ * those lines, src/examples/README.md §4). Free of terminal I/O, so
+ * `src/cli/commands/review.ts` supplies a `readline`-backed `ask` and tests
+ * supply a scripted one.
  */
 export async function runReviewSession(
   results: Results,
   existingEntries: readonly ReviewEntry[],
+  context: ReviewSessionContext,
   callbacks: ReviewSessionCallbacks,
   options: ReviewSessionOptions = {},
 ): Promise<ReviewSessionResult> {
   const matches = collectUnreviewedMatches(results);
-  const typeByRuleId = new Map<string, RuleResult['type']>(results.rules.map((rule) => [rule.ruleId, rule.type]));
+  const ruleById = new Map<string, Rule>(context.ruleSet.rules.map((rule) => [rule.id, rule]));
   const nextId = makeIdGenerator(existingEntries);
   const entries: ReviewEntry[] = [...existingEntries];
   let correct = 0;
@@ -171,20 +224,26 @@ export async function runReviewSession(
       skipped += 1;
       continue;
     }
-    if (matchedLineText(item.match).trim() === '') {
-      callbacks.onSkipped?.(item, 'its line has no text (unexpected)');
+    const rule = ruleById.get(item.ruleId);
+    if (rule === undefined) {
+      callbacks.onSkipped?.(item, `rule ${item.ruleId} is not in the given Rule Set`);
       skipped += 1;
       continue;
     }
-    const ruleType = typeByRuleId.get(item.ruleId);
-    if (ruleType === undefined) {
-      callbacks.onSkipped?.(item, `rule ${item.ruleId} is missing from the results`);
+    const fileText = context.readSampleFile(item.match.file);
+    if (fileText === undefined) {
+      callbacks.onSkipped?.(item, `sample file ${item.match.file} could not be read (pass --sample <dir>, the one used to produce these results)`);
       skipped += 1;
       continue;
     }
     const id = nextId(item.construct);
-    const entry = buildReviewEntry(item, ruleType, verdict, id, options.now !== undefined ? { now: options.now } : {});
-    entries.push(entry);
+    const built = buildReviewEntry(item, rule, context.ruleSet, fileText, verdict, id, options.now !== undefined ? { now: options.now } : {});
+    if (!built.ok) {
+      callbacks.onSkipped?.(item, built.reason);
+      skipped += 1;
+      continue;
+    }
+    entries.push(built.entry);
     if (verdict === 'correct') correct += 1;
     else falsePositive += 1;
     callbacks.onRecorded?.(entries);

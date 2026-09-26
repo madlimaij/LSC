@@ -11,6 +11,7 @@ import type {
   Report,
   RepresentativeMatchEntry,
   RuleReport,
+  SynthesisAttemptView,
   WrongCaptureEntry,
 } from './model.js';
 
@@ -38,6 +39,7 @@ function renderVerdict(report: Report): string {
     `- Low-confidence rules: ${String(overall.lowConfidenceRuleCount)}`,
     `- Rejected/broken rules: ${String(overall.rejectedRuleCount)}`,
     `- Example pass rate (own examples): ${String(Math.round(overall.examplePassRate * 1000) / 10)}% (${String(report.rules.reduce((s, r) => s + r.testsPassed, 0))}/${String(overall.totalOwnExamples)})`,
+    `- Unreviewed sample matches: ${String(overall.unreviewedSampleMatchCount)}${overall.unreviewedSampleMatchCount > 0 ? ' (run `lsc review`)' : ''}`,
     overall.constructsWithoutUsableRule.length > 0
       ? `- Constructs without a usable rule: ${overall.constructsWithoutUsableRule.join(', ')}`
       : `- Every construct with examples has a usable rule`,
@@ -45,18 +47,30 @@ function renderVerdict(report: Report): string {
   return lines.join('\n');
 }
 
+/**
+ * Confidence is never shown without its reason (CLAUDE.md): the coverage
+ * table's own cell is a single word ("low", "rejected", …), so each row
+ * also gets a pointer to the rule section below that spells the reason out
+ * (`explainConfidence`, confidence-reason.ts) — a link when there is a rule
+ * to link to, otherwise a short inline reason.
+ */
+function confidenceReasonPointer(row: Report['coverage'][number]): string {
+  if (row.ruleIds.length === 0) return 'no validated rule for this type — see the Verdict above';
+  return row.ruleIds.map((id) => `see [\`${id}\`](#rule-${id}) below`).join('; ');
+}
+
 function renderCoverage(report: Report): string {
   const rows = report.coverage.map((row) => {
     const status = row.status === 'no-rule' ? 'no validated rule' : row.status;
     const confidence = row.confidences.length === 0 ? '—' : [...new Set(row.confidences)].join(', ');
     const ruleIds = row.ruleIds.length === 0 ? '—' : row.ruleIds.join(', ');
-    return `| ${row.ruleType} | ${status} | ${confidence} | ${ruleIds} |`;
+    return `| ${row.ruleType} | ${status} | ${confidence} | ${ruleIds} | ${confidenceReasonPointer(row)} |`;
   });
   return [
     '## Coverage',
     '',
-    '| Rule type | Status | Confidence | Rule(s) |',
-    '| --- | --- | --- | --- |',
+    '| Rule type | Status | Confidence | Rule(s) | Confidence reason |',
+    '| --- | --- | --- | --- | --- |',
     ...rows,
   ].join('\n');
 }
@@ -143,6 +157,7 @@ function renderProvenance(rule: RuleReport): string {
 function renderRule(rule: RuleReport): string {
   const status = rule.ok ? 'OK' : 'DEFECT';
   const parts = [
+    `<a id="rule-${rule.ruleId}"></a>`,
     `### \`${rule.ruleId}\` (${rule.type}) — ${status}`,
     '',
     rule.pattern !== undefined ? `- Pattern: \`${rule.pattern}\`` : `- Pattern: unavailable (pass \`--ruleset\` to \`lsc report\`)`,
@@ -189,6 +204,71 @@ function renderSourceSkills(report: Report): string {
   return report.sourceSkills.map((s) => `- \`${s.path}\` — sha256 \`${s.sha256}\``).join('\n');
 }
 
+function renderSkillHashMismatches(report: Report): string {
+  if (report.skillHashMismatches === undefined) return '';
+  if (report.skillHashMismatches.length === 0) {
+    return '\n_Checked against `--skills-dir`: every Skill file hash still matches._\n';
+  }
+  const body = report.skillHashMismatches
+    .map((m) =>
+      m.currentSha256 === undefined
+        ? `- ⚠ \`${m.path}\`: in the Rule Set's \`sourceSkills\` (sha256 \`${m.ruleSetSha256}\`) but not found under \`--skills-dir\``
+        : `- ⚠ \`${m.path}\`: sha256 differs — Rule Set \`${m.ruleSetSha256}\`, current \`${m.currentSha256}\``,
+    )
+    .join('\n');
+  return `\n**⚠ Skill file hashes differ from \`--skills-dir\`** (reviewer Q5, D25 item 4): this Rule Set may not reflect the documentation currently on disk.\n\n${body}\n`;
+}
+
+/** Lexical settings (docs/PLAN.md §5.1): comment/string markers and `fileMatchers`, only with `--ruleset` (D25 item 2). */
+function renderLexical(report: Report): string {
+  if (report.lexical === undefined) {
+    return '_Lexical settings unavailable (pass `--ruleset` to `lsc report`)._';
+  }
+  const l = report.lexical;
+  const lines = [
+    `- File matchers: ${l.fileMatchers.map((g) => `\`${g}\``).join(', ')}`,
+    `- Line comment: ${l.lineComment !== undefined ? `\`${l.lineComment}\`` : '_(none)_'}`,
+    `- Block comment: ${l.blockComment !== undefined ? `\`${l.blockComment.start}\` … \`${l.blockComment.end}\`` : '_(none)_'}`,
+    `- String delimiters: ${
+      l.stringDelimiters !== undefined && l.stringDelimiters.length > 0
+        ? l.stringDelimiters.map((d) => `\`${d.start}\` … \`${d.end}\``).join(', ')
+        : '_(none)_'
+    }`,
+  ];
+  return lines.join('\n');
+}
+
+function renderSynthesisAttempts(attempts: readonly SynthesisAttemptView[]): string {
+  if (attempts.length === 0) return '_(no attempts recorded)_';
+  return attempts
+    .map((a) => `  - attempt ${String(a.attempt)}: **${a.outcome}**${a.problems.length > 0 ? ` — ${a.problems.join(' | ')}` : ''}`)
+    .join('\n');
+}
+
+/** Each construct's synthesis outcome and reasons from `synthesis.json` (D25 item 2), only with `--synthesis`. */
+function renderSynthesis(report: Report): string {
+  if (report.synthesis === undefined) {
+    return '_Synthesis details unavailable (pass `--synthesis <file>` to `lsc report`)._';
+  }
+  const s = report.synthesis;
+  const lines = [
+    `- Compile status: **${s.status}**${s.error !== undefined ? ` — ${s.error}` : ''}`,
+    `- Lexical settings: **${s.lexicalStatus}**${s.lexicalReason !== undefined ? ` — ${s.lexicalReason}` : ''}`,
+    `- Constructs: ${String(s.summary.constructs)} (validated ${String(s.summary.validated)}, rejected ${String(s.summary.rejected)}, ` +
+      `not justified ${String(s.summary.notJustified)}, skipped ${String(s.summary.skipped)}, not attempted ${String(s.summary.notAttempted)})`,
+    `- Model usage: ${String(s.usage.calls)} call(s), ${String(s.usage.inputTokens)} input + ${String(s.usage.outputTokens)} output tokens`,
+    `- ⚠ ${s.providerNote}`,
+    '',
+    ...s.constructs.map(
+      (c) =>
+        `- \`${c.constructId}\`${c.ruleType !== undefined ? ` (${c.ruleType})` : ''} — **${c.status}**` +
+        `${c.ruleId !== undefined ? ` (rule \`${c.ruleId}\`)` : ''}, ${String(c.attemptCount)} attempt(s)` +
+        `${c.reason !== undefined ? `: ${c.reason}` : ''}\n${renderSynthesisAttempts(c.attempts)}`,
+    ),
+  ];
+  return lines.join('\n');
+}
+
 function renderSampleWarnings(report: Report): string {
   if (report.sampleWarnings.length === 0) return '';
   const body = report.sampleWarnings
@@ -206,15 +286,24 @@ export function renderMarkdown(report: Report): string {
     '',
     renderCoverage(report),
     '',
+    '## Lexical settings',
+    '',
+    renderLexical(report),
+    '',
     '## Rules',
     '',
     ...report.rules.map((rule) => renderRule(rule)),
     renderSampleWarnings(report),
+    '## Synthesis',
+    '',
+    renderSynthesis(report),
+    '',
     '## Provenance',
     '',
     '### Skill file hashes',
     '',
     renderSourceSkills(report),
+    renderSkillHashMismatches(report),
     '',
   ];
   return `${sections.join('\n')}\n`;

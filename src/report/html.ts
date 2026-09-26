@@ -123,7 +123,7 @@ function renderRule(rule: RuleReport): string {
       ? esc(rule.captures.map(([role, group]) => `${role} → ${group}`).join(', ') || '(none)')
       : 'unavailable (pass <code>--ruleset</code>)';
   return `
-<section class="rule ${statusClass}">
+<section class="rule ${statusClass}" id="rule-${esc(rule.ruleId)}">
   <h3><code>${esc(rule.ruleId)}</code> (${esc(rule.type)}) &mdash; <span class="badge ${statusClass}">${rule.ok ? 'OK' : 'DEFECT'}</span></h3>
   <ul class="facts">
     <li>Pattern: <code>${pattern}</code></li>
@@ -156,6 +156,78 @@ function renderSourceSkills(report: Report): string {
   return `<ul>${report.sourceSkills.map((s) => `<li><code>${esc(s.path)}</code> &mdash; sha256 <code>${esc(s.sha256)}</code></li>`).join('')}</ul>`;
 }
 
+function renderSkillHashMismatches(report: Report): string {
+  if (report.skillHashMismatches === undefined) return '';
+  if (report.skillHashMismatches.length === 0) {
+    return `<p class="muted">Checked against <code>--skills-dir</code>: every Skill file hash still matches.</p>`;
+  }
+  const body = report.skillHashMismatches
+    .map((m) =>
+      m.currentSha256 === undefined
+        ? `<li class="warn"><code>${esc(m.path)}</code>: in the Rule Set's <code>sourceSkills</code> (sha256 <code>${esc(m.ruleSetSha256)}</code>) but not found under <code>--skills-dir</code></li>`
+        : `<li class="warn"><code>${esc(m.path)}</code>: sha256 differs &mdash; Rule Set <code>${esc(m.ruleSetSha256)}</code>, current <code>${esc(m.currentSha256)}</code></li>`,
+    )
+    .join('');
+  return (
+    `<p class="warn">Skill file hashes differ from <code>--skills-dir</code> (reviewer Q5, D25 item 4): this Rule Set may not reflect ` +
+    `the documentation currently on disk.</p><ul>${body}</ul>`
+  );
+}
+
+function renderLexical(report: Report): string {
+  if (report.lexical === undefined) {
+    return `<p class="muted">Lexical settings unavailable (pass <code>--ruleset</code> to <code>lsc report</code>).</p>`;
+  }
+  const l = report.lexical;
+  const fileMatchers = l.fileMatchers.map((g) => `<code>${esc(g)}</code>`).join(', ');
+  const lineComment = l.lineComment !== undefined ? `<code>${esc(l.lineComment)}</code>` : '<em>(none)</em>';
+  const blockComment = l.blockComment !== undefined ? `<code>${esc(l.blockComment.start)}</code> … <code>${esc(l.blockComment.end)}</code>` : '<em>(none)</em>';
+  const stringDelimiters =
+    l.stringDelimiters !== undefined && l.stringDelimiters.length > 0
+      ? l.stringDelimiters.map((d) => `<code>${esc(d.start)}</code> … <code>${esc(d.end)}</code>`).join(', ')
+      : '<em>(none)</em>';
+  return (
+    `<ul class="facts"><li>File matchers: ${fileMatchers}</li><li>Line comment: ${lineComment}</li>` +
+    `<li>Block comment: ${blockComment}</li><li>String delimiters: ${stringDelimiters}</li></ul>`
+  );
+}
+
+function renderSynthesisAttempts(attempts: NonNullable<Report['synthesis']>['constructs'][number]['attempts']): string {
+  if (attempts.length === 0) return '<p class="muted">(no attempts recorded)</p>';
+  const items = attempts
+    .map(
+      (a) =>
+        `<li>attempt ${String(a.attempt)}: <strong>${esc(a.outcome)}</strong>${a.problems.length > 0 ? ` &mdash; ${esc(a.problems.join(' | '))}` : ''}</li>`,
+    )
+    .join('');
+  return `<ul>${items}</ul>`;
+}
+
+function renderSynthesis(report: Report): string {
+  if (report.synthesis === undefined) {
+    return `<p class="muted">Synthesis details unavailable (pass <code>--synthesis &lt;file&gt;</code> to <code>lsc report</code>).</p>`;
+  }
+  const s = report.synthesis;
+  const constructs = s.constructs
+    .map(
+      (c) =>
+        `<li><code>${esc(c.constructId)}</code>${c.ruleType !== undefined ? ` (${esc(c.ruleType)})` : ''} &mdash; <strong>${esc(c.status)}</strong>` +
+        `${c.ruleId !== undefined ? ` (rule <code>${esc(c.ruleId)}</code>)` : ''}, ${String(c.attemptCount)} attempt(s)` +
+        `${c.reason !== undefined ? `: ${esc(c.reason)}` : ''}${renderSynthesisAttempts(c.attempts)}</li>`,
+    )
+    .join('');
+  return (
+    `<ul class="facts">` +
+    `<li>Compile status: <strong>${esc(s.status)}</strong>${s.error !== undefined ? ` &mdash; ${esc(s.error)}` : ''}</li>` +
+    `<li>Lexical settings: <strong>${esc(s.lexicalStatus)}</strong>${s.lexicalReason !== undefined ? ` &mdash; ${esc(s.lexicalReason)}` : ''}</li>` +
+    `<li>Constructs: ${String(s.summary.constructs)} (validated ${String(s.summary.validated)}, rejected ${String(s.summary.rejected)}, ` +
+    `not justified ${String(s.summary.notJustified)}, skipped ${String(s.summary.skipped)}, not attempted ${String(s.summary.notAttempted)})</li>` +
+    `<li>Model usage: ${String(s.usage.calls)} call(s), ${String(s.usage.inputTokens)} input + ${String(s.usage.outputTokens)} output tokens</li>` +
+    `<li class="warn">${esc(s.providerNote)}</li>` +
+    `</ul><ul>${constructs}</ul>`
+  );
+}
+
 function renderSampleWarnings(report: Report): string {
   if (report.sampleWarnings.length === 0) return '';
   const body = report.sampleWarnings
@@ -164,16 +236,28 @@ function renderSampleWarnings(report: Report): string {
   return `<h2>Sample-scan warnings</h2><ul>${body}</ul>`;
 }
 
+/**
+ * Confidence is never shown without its reason (CLAUDE.md): the coverage
+ * table's own cell is a single word, so each row also gets a pointer to the
+ * rule section below that spells the reason out (`explainConfidence`,
+ * confidence-reason.ts) — a link when there is a rule to link to (`id="rule-<id>"`
+ * on that rule's `<section>`, `renderRule`), otherwise a short inline reason.
+ */
+function confidenceReasonPointer(row: Report['coverage'][number]): string {
+  if (row.ruleIds.length === 0) return 'no validated rule for this type &mdash; see the Verdict above';
+  return row.ruleIds.map((id) => `see <a href="#rule-${esc(id)}"><code>${esc(id)}</code></a> below`).join('; ');
+}
+
 function renderCoverage(report: Report): string {
   const rows = report.coverage
     .map((row) => {
       const status = row.status === 'no-rule' ? 'no validated rule' : row.status;
       const confidence = row.confidences.length === 0 ? '&mdash;' : esc([...new Set(row.confidences)].join(', '));
       const ruleIds = row.ruleIds.length === 0 ? '&mdash;' : esc(row.ruleIds.join(', '));
-      return `<tr class="cov-${esc(row.status)}"><td>${esc(row.ruleType)}</td><td>${esc(status)}</td><td>${confidence}</td><td>${ruleIds}</td></tr>`;
+      return `<tr class="cov-${esc(row.status)}"><td>${esc(row.ruleType)}</td><td>${esc(status)}</td><td>${confidence}</td><td>${ruleIds}</td><td>${confidenceReasonPointer(row)}</td></tr>`;
     })
     .join('');
-  return `<table><thead><tr><th>Rule type</th><th>Status</th><th>Confidence</th><th>Rule(s)</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<table><thead><tr><th>Rule type</th><th>Status</th><th>Confidence</th><th>Rule(s)</th><th>Confidence reason</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 const STYLE = `
@@ -233,6 +317,7 @@ export function renderHtml(report: Report): string {
     <li>Low-confidence rules: ${String(overall.lowConfidenceRuleCount)}</li>
     <li>Rejected/broken rules: ${String(overall.rejectedRuleCount)}</li>
     <li>Example pass rate (own examples): ${passRatePct}% (${String(totalOwnPassed)}/${String(overall.totalOwnExamples)})</li>
+    <li>Unreviewed sample matches: ${String(overall.unreviewedSampleMatchCount)}${overall.unreviewedSampleMatchCount > 0 ? ' (run <code>lsc review</code>)' : ''}</li>
     <li>${overall.constructsWithoutUsableRule.length > 0 ? `Constructs without a usable rule: ${esc(overall.constructsWithoutUsableRule.join(', '))}` : 'Every construct with examples has a usable rule'}</li>
   </ul>
 </div>
@@ -240,14 +325,21 @@ export function renderHtml(report: Report): string {
 <h2>Coverage</h2>
 ${renderCoverage(report)}
 
+<h2>Lexical settings</h2>
+${renderLexical(report)}
+
 <h2>Rules</h2>
 ${report.rules.map((rule) => renderRule(rule)).join('')}
 
 ${renderSampleWarnings(report)}
 
+<h2>Synthesis</h2>
+${renderSynthesis(report)}
+
 <h2>Provenance</h2>
 <h3>Skill file hashes</h3>
 ${renderSourceSkills(report)}
+${renderSkillHashMismatches(report)}
 
 </body>
 </html>

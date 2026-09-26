@@ -5,30 +5,39 @@ exports[`renderMarkdown > matches the snapshot for the healthy toylang fixture, 
 
 ## Verdict
 
-**VALIDATED — 100% of own examples pass (74/74); all 8 validated rule(s) pass every own example at high or medium confidence**
+**VALIDATED — 100% of own examples pass (74/74); 138 sample matches not yet reviewed; all 8 validated rule(s) pass every own example at high or medium confidence**
 
 - Rule Set: \`toylang\` version \`1.0.0\` (compiled with lsc \`0.1.0\`, generated 2026-09-26T00:00:00.000Z)
 - Validated rules (high/medium confidence, own tests pass): 8
 - Low-confidence rules: 0
 - Rejected/broken rules: 0
 - Example pass rate (own examples): 100% (74/74)
+- Unreviewed sample matches: 138 (run \`lsc review\`)
 - Every construct with examples has a usable rule
 
 ## Coverage
 
-| Rule type | Status | Confidence | Rule(s) |
-| --- | --- | --- | --- |
-| module_declaration | validated | high | module-declaration |
-| symbol_definition | validated | high | proc-definition |
-| call | validated | high | call-statement |
-| include | validated | high | include-directive |
-| db_read | validated | high | db-read |
-| db_write | validated | high | db-write |
-| config_ref | validated | high | config-flag |
-| entry_point | validated | high | entry-point |
+| Rule type | Status | Confidence | Rule(s) | Confidence reason |
+| --- | --- | --- | --- | --- |
+| module_declaration | validated | high | module-declaration | see [\`module-declaration\`](#rule-module-declaration) below |
+| symbol_definition | validated | high | proc-definition | see [\`proc-definition\`](#rule-proc-definition) below |
+| call | validated | high | call-statement | see [\`call-statement\`](#rule-call-statement) below |
+| include | validated | high | include-directive | see [\`include-directive\`](#rule-include-directive) below |
+| db_read | validated | high | db-read | see [\`db-read\`](#rule-db-read) below |
+| db_write | validated | high | db-write | see [\`db-write\`](#rule-db-write) below |
+| config_ref | validated | high | config-flag | see [\`config-flag\`](#rule-config-flag) below |
+| entry_point | validated | high | entry-point | see [\`entry-point\`](#rule-entry-point) below |
+
+## Lexical settings
+
+- File matchers: \`**/*.tl\`
+- Line comment: \`--\`
+- Block comment: \`/*\` … \`*/\`
+- String delimiters: \`"\` … \`"\`
 
 ## Rules
 
+<a id="rule-module-declaration"></a>
 ### \`module-declaration\` (module_declaration) — OK
 
 - Pattern: \`exact: MODULE <token> (case-insensitive)\`
@@ -263,6 +272,7 @@ _None._
 
 - \`skills/module.md\` § declaring-a-module — examples: module-01, module-02, module-03, module-04, module-05, module-06, module-neg-01, module-neg-02, module-neg-03
 
+<a id="rule-proc-definition"></a>
 ### \`proc-definition\` (symbol_definition) — OK
 
 - Pattern: \`regex: /^\\s*(?<kind>PROC|FUNC)\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)/i (per line)\`
@@ -725,6 +735,7 @@ _None._
 
 - \`skills/procedure.md\` § defining-a-procedure — examples: proc-01, proc-02, proc-03, proc-04, proc-05, proc-06, proc-neg-01, proc-neg-02, proc-neg-03
 
+<a id="rule-call-statement"></a>
 ### \`call-statement\` (call) — OK
 
 - Pattern: \`regex: /\\bCALL\\s+(?:(?<module>[A-Za-z_][A-Za-z0-9_]*)\\.)?(?<callee>[A-Za-z_][A-Za-z0-9_]*)\\s*\\(/i (per line)\`
@@ -1024,6 +1035,7 @@ _None._
 
 - \`skills/call.md\` § calling-a-procedure — examples: call-01, call-02, call-03, call-04, call-05, call-06, call-07, call-neg-01, call-neg-02, call-neg-03
 
+<a id="rule-include-directive"></a>
 ### \`include-directive\` (include) — OK
 
 - Pattern: \`regex: /^\\s*INCLUDE\\s+"(?<target>[^"]+)"/i (per line)\`
@@ -1220,6 +1232,7 @@ _None._
 
 - \`skills/include.md\` § including-a-file — examples: include-01, include-02, include-03, include-04, include-05, include-06, include-neg-01, include-neg-02, include-neg-03
 
+<a id="rule-db-read"></a>
 ### \`db-read\` (db_read) — OK
 
 - Pattern: \`regex: /\\bREAD\\s+(?:&\\s+)?(?<table>[A-Za-z_][A-Za-z0-9_]*)/i (whole file)\`
@@ -1515,6 +1528,7 @@ _None._
 
 - \`skills/db-read.md\` § reading-a-table — examples: read-01, read-02, read-03, read-04, read-05, read-06, read-07, read-neg-01, read-neg-02, read-neg-03
 
+<a id="rule-db-write"></a>
 ### \`db-write\` (db_write) — OK
 
 - Pattern: \`regex: /\\bWRITE\\s+(?<table>[A-Za-z_][A-Za-z0-9_]*)/i (per line)\`
@@ -1725,6 +1739,7 @@ _None._
 
 - \`skills/db-write.md\` § writing-a-table — examples: write-01, write-02, write-03, write-04, write-05, write-06, write-neg-01, write-neg-02, write-neg-03
 
+<a id="rule-config-flag"></a>
 ### \`config-flag\` (config_ref) — OK
 
 - Pattern: \`regex: /\\bFLAG\\s*\\(\\s*"(?<key>[^"]+)"\\s*\\)/i (per line)\`
@@ -1897,6 +1912,7 @@ _None._
 
 - \`skills/config-flag.md\` § feature-flags — examples: flag-01, flag-02, flag-03, flag-04, flag-05, flag-06, flag-neg-01, flag-neg-02, flag-neg-03
 
+<a id="rule-entry-point"></a>
 ### \`entry-point\` (entry_point) — OK
 
 - Pattern: \`exact: ENTRY <token> -> (case-insensitive)\`
@@ -2037,6 +2053,10 @@ _None._
 - \`proc-definition\` unclosed-block at \`batch/retry.tl:4\`: scope opened by rule "proc-definition" at line 4 is never closed (end of file)
 - \`proc-definition\` unmatched-block-end at \`legacy/old_billing.tl:17\`: blockEnd of rule "proc-definition" at line 17 has no open scope of that rule
 
+## Synthesis
+
+_Synthesis details unavailable (pass \`--synthesis <file>\` to \`lsc report\`)._
+
 ## Provenance
 
 ### Skill file hashes
@@ -2050,6 +2070,7 @@ _None._
 - \`skills/db-write.md\` — sha256 \`45a60588788bbce069eb6b24566f5a7828749d7ff4aa16f24f0a8318d4b5a3fe\`
 - \`skills/config-flag.md\` — sha256 \`ea9696b64b82100786b84303cddf86cf1ead527c13d85c9ae8153c7b84ffc6c9\`
 - \`skills/entry-point.md\` — sha256 \`1f3d265af107947941089481aa3fec7d9c115e3857e99ef7dc4b4a9ef588140c\`
+
 
 "
 `;

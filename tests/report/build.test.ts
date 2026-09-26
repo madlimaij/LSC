@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildReport } from '../../src/report/build.js';
+import type { SynthesisReport } from '../../src/synth/index.js';
 import {
   cloneRuleSet,
   fixtureExamplesById,
@@ -7,6 +8,30 @@ import {
   loadSampleFiles,
   runFixture,
 } from './helpers.js';
+
+function fakeSynthesis(overrides: Partial<SynthesisReport> = {}): SynthesisReport {
+  return {
+    languageId: 'toylang',
+    compilerVersion: '0.1.0',
+    generatedAt: '2026-09-26T00:00:00.000Z',
+    status: 'completed',
+    maxAttemptsPerConstruct: 3,
+    lexical: { status: 'accepted', attempts: [] },
+    constructs: [
+      {
+        constructId: 'db-read',
+        ruleType: 'db_read',
+        status: 'validated',
+        ruleId: 'db-read',
+        attempts: [{ attempt: 1, requestHash: 'a'.repeat(64), outcome: 'passed', problems: [], usage: { inputTokens: 1, outputTokens: 1 } }],
+      },
+    ],
+    summary: { constructs: 1, validated: 1, rejected: 0, notJustified: 0, skipped: 0, notAttempted: 0 },
+    usage: { inputTokens: 1, outputTokens: 1, calls: 1 },
+    ingestDiagnostics: [],
+    ...overrides,
+  };
+}
 
 describe('buildReport on the healthy toylang fixture', () => {
   it('every section is present and the overall verdict is validated', () => {
@@ -118,5 +143,70 @@ describe('buildReport on a deliberately broken toylang fixture (WP-05 breakage r
       expectedCaptures: { name: 'calc_total', kind: 'PROC' },
       actualCaptures: { name: 'PROC', kind: 'calc_total' },
     });
+  });
+});
+
+describe('buildReport: D25 owner additions', () => {
+  it('the verdict line names the number of unreviewed sample matches', () => {
+    const results = runFixture(loadFixtureRuleSet(), loadSampleFiles());
+    const report = buildReport(results);
+    expect(report.overall.unreviewedSampleMatchCount).toBeGreaterThan(0);
+    expect(report.overall.summary).toContain(`${String(report.overall.unreviewedSampleMatchCount)} sample match`);
+  });
+
+  it('zero unreviewed sample matches is stated, not silently omitted', () => {
+    const results = runFixture(); // no sample files
+    const report = buildReport(results);
+    expect(report.overall.unreviewedSampleMatchCount).toBe(0);
+    expect(report.overall.summary).toContain('no unreviewed sample matches');
+  });
+
+  it('--ruleset adds lexical settings (comment/string markers, fileMatchers)', () => {
+    const results = runFixture();
+    const report = buildReport(results, { ruleSet: loadFixtureRuleSet() });
+    expect(report.lexical).toBeDefined();
+    expect(report.lexical?.fileMatchers).toEqual(loadFixtureRuleSet().fileMatchers);
+  });
+
+  it('without --ruleset, lexical settings are unavailable, not guessed', () => {
+    const results = runFixture();
+    const report = buildReport(results);
+    expect(report.lexical).toBeUndefined();
+  });
+
+  it('a synthesis.json adds each construct\'s outcome and reasons', () => {
+    const results = runFixture();
+    const report = buildReport(results, { synthesis: fakeSynthesis() });
+    expect(report.synthesis?.constructs).toHaveLength(1);
+    expect(report.synthesis?.constructs[0]).toMatchObject({ constructId: 'db-read', status: 'validated', attemptCount: 1 });
+    expect(report.synthesis?.providerNote.length).toBeGreaterThan(0); // states what's missing, never silent
+  });
+
+  it('without --synthesis, synthesis details are unavailable, not guessed', () => {
+    const results = runFixture();
+    const report = buildReport(results);
+    expect(report.synthesis).toBeUndefined();
+  });
+
+  it('--ruleset + a matching current Skill hash set reports no mismatches', () => {
+    const results = runFixture();
+    const ruleSet = loadFixtureRuleSet();
+    const report = buildReport(results, { ruleSet, currentSourceSkills: ruleSet.sourceSkills });
+    expect(report.skillHashMismatches).toEqual([]);
+  });
+
+  it('a differing current Skill hash is reported as a mismatch', () => {
+    const results = runFixture();
+    const ruleSet = loadFixtureRuleSet();
+    const current = ruleSet.sourceSkills.map((s, i) => (i === 0 ? { ...s, sha256: 'f'.repeat(64) } : s));
+    const report = buildReport(results, { ruleSet, currentSourceSkills: current });
+    expect(report.skillHashMismatches).toHaveLength(1);
+    expect(report.skillHashMismatches?.[0]?.path).toBe(ruleSet.sourceSkills[0]?.path);
+  });
+
+  it('without a current Skill hash set, the mismatch check is unavailable, not guessed', () => {
+    const results = runFixture();
+    const report = buildReport(results, { ruleSet: loadFixtureRuleSet() });
+    expect(report.skillHashMismatches).toBeUndefined();
   });
 });

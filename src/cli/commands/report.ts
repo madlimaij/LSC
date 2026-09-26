@@ -9,7 +9,7 @@
  * (`--ruleset`) and source snippets (`--skills-dir`) are reported as
  * unavailable rather than guessed. See this package's completion note.
  */
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import type { RuleSet } from '../../contract/index.js';
 import { loadRuleSetFile } from '../../contract/load.js';
@@ -17,7 +17,9 @@ import type { Example } from '../../examples/index.js';
 import { ingestSkills } from '../../ingest/index.js';
 import { buildReport, renderHtml, renderMarkdown } from '../../report/index.js';
 import { indexExamplesById } from '../../report/example-location.js';
+import { describeSkillHashMismatch, findSkillHashMismatches } from '../../report/skill-hash-check.js';
 import { loadResultsFile } from '../../report/load-results.js';
+import { SynthesisReportSchema, type SynthesisReport } from '../../synth/index.js';
 
 export const name = 'report';
 export const description = 'Render the validation report for a Results file (Markdown, HTML or JSON)';
@@ -28,6 +30,7 @@ interface Options {
   readonly format?: string;
   readonly ruleset?: string;
   readonly skillsDir?: string;
+  readonly synthesis?: string;
   readonly out?: string;
 }
 
@@ -41,8 +44,9 @@ export function configure(cmd: Command): void {
   cmd
     .argument('<results>', 'Results JSON file (written by `lsc test` or `lsc compile`)')
     .option('--format <format>', 'output format: md, html or json (default md)')
-    .option('--ruleset <file>', 'the Rule Set the results were produced from, for pattern/captures/provenance')
-    .option('--skills-dir <dir>', 'Skill directory used to test, for source locations and snippets')
+    .option('--ruleset <file>', 'the Rule Set the results were produced from, for pattern/captures/provenance/lexical settings')
+    .option('--skills-dir <dir>', 'Skill directory used to test, for source locations, snippets and a Skill-hash drift check (with --ruleset)')
+    .option('--synthesis <file>', 'synthesis.json (written by `lsc compile`), for each construct\'s synthesis outcome and reasons (D25 item 2)')
     .option('--out <file>', 'write the report to this file instead of stdout')
     .action((resultsPath: string, options: Options) => {
       let format: Format;
@@ -74,12 +78,47 @@ export function configure(cmd: Command): void {
       }
 
       let examplesById: ReadonlyMap<string, Example> | undefined;
+      let currentSourceSkills: { path: string; sha256: string }[] | undefined;
       if (options.skillsDir !== undefined) {
         const ingested = ingestSkills(options.skillsDir);
         examplesById = indexExamplesById(ingested.constructs.flatMap((construct) => construct.examples));
+        currentSourceSkills = ingested.sourceSkills;
       }
 
-      const report = buildReport(results, { ...(ruleSet !== undefined ? { ruleSet } : {}), ...(examplesById !== undefined ? { examplesById } : {}) });
+      // Reviewer Q5 / D25 item 4: warn (report + stderr) when the current Skill file hashes differ
+      // from what the Rule Set was compiled from — needs both --ruleset and --skills-dir.
+      if (ruleSet !== undefined && currentSourceSkills !== undefined) {
+        const mismatches = findSkillHashMismatches(ruleSet.sourceSkills, currentSourceSkills);
+        for (const mismatch of mismatches) {
+          process.stderr.write(`WARNING: ${describeSkillHashMismatch(mismatch)}\n`);
+        }
+      }
+
+      let synthesis: SynthesisReport | undefined;
+      if (options.synthesis !== undefined) {
+        let text: string;
+        try {
+          text = readFileSync(options.synthesis, 'utf8');
+        } catch (error) {
+          process.exitCode = 1;
+          process.stderr.write(`ERROR: cannot read ${options.synthesis}: ${error instanceof Error ? error.message : String(error)}\n`);
+          return;
+        }
+        const parsed = SynthesisReportSchema.safeParse(JSON.parse(text));
+        if (!parsed.success) {
+          process.exitCode = 1;
+          process.stderr.write(`ERROR: ${options.synthesis} is not a valid synthesis.json\n`);
+          return;
+        }
+        synthesis = parsed.data;
+      }
+
+      const report = buildReport(results, {
+        ...(ruleSet !== undefined ? { ruleSet } : {}),
+        ...(examplesById !== undefined ? { examplesById } : {}),
+        ...(synthesis !== undefined ? { synthesis } : {}),
+        ...(ruleSet !== undefined && currentSourceSkills !== undefined ? { currentSourceSkills } : {}),
+      });
 
       const rendered =
         format === 'json' ? `${JSON.stringify(report, null, 2)}\n` : format === 'html' ? renderHtml(report) : renderMarkdown(report);

@@ -8,12 +8,14 @@
 import { RULE_TYPES, type Rule, type RuleSet } from '../contract/index.js';
 import type { Example } from '../examples/index.js';
 import type { Results, RuleResult } from '../runner/index.js';
+import type { SynthesisReport } from '../synth/synthesis-schema.js';
 import { declaredMismatchNote, deriveConfidenceStats, explainConfidence } from './confidence-reason.js';
 import { exampleSnippet } from './example-location.js';
 import type {
   CoverageRow,
   ExtraMatchEntry,
   FalsePositiveEntry,
+  LexicalSettingsView,
   LocatedSnippet,
   MissedExampleEntry,
   OverallVerdict,
@@ -25,12 +27,21 @@ import type {
 } from './model.js';
 import { describeCaptures, describePattern } from './pattern.js';
 import { isRuleOk } from './rule-status.js';
+import { findSkillHashMismatches, type SourceSkillLike } from './skill-hash-check.js';
+import { buildSynthesisView } from './synthesis-view.js';
 
 export interface BuildReportOptions {
-  /** The Rule Set the results were produced from: adds pattern, captures and provenance per rule. */
+  /** The Rule Set the results were produced from: adds pattern, captures, provenance and lexical settings per rule. */
   readonly ruleSet?: RuleSet;
   /** The examples the results were tested against: adds a `file:line` location and snippet to each entry. */
   readonly examplesById?: ReadonlyMap<string, Example>;
+  /** `synthesis.json` (WP-09): adds each construct's synthesis outcome and reasons (D25 item 2). */
+  readonly synthesis?: SynthesisReport;
+  /**
+   * Freshly-hashed Skill files at the `--skills-dir` given to this report (e.g. `ingestSkills(dir).sourceSkills`),
+   * compared against `ruleSet.sourceSkills` (reviewer Q5, D25 item 4). Needs `ruleSet` too.
+   */
+  readonly currentSourceSkills?: readonly SourceSkillLike[];
 }
 
 function snippetFor(exampleId: string, line: number, examplesById?: ReadonlyMap<string, Example>): LocatedSnippet | undefined {
@@ -219,9 +230,17 @@ function buildOverallVerdict(results: Results, rules: readonly RuleReport[]): Ov
     reasons.push(`all ${String(validated.length)} validated rule(s) pass every own example at high or medium confidence`);
   }
 
+  const unreviewedSampleMatchCount = rules.reduce((sum, rule) => sum + rule.sampleMatches.length, 0);
+
   const verdictLabel = verdict === 'validated' ? 'VALIDATED' : verdict === 'low-confidence' ? 'LOW CONFIDENCE' : 'REJECTED';
   const passRatePct = Math.round(examplePassRate * 1000) / 10;
-  const summary = `${verdictLabel} — ${String(passRatePct)}% of own examples pass (${String(totalOwnPassed)}/${String(totalOwnExamples)}); ${reasons.join('; ')}`;
+  const sampleMatchesClause =
+    unreviewedSampleMatchCount === 0
+      ? 'no unreviewed sample matches'
+      : `${String(unreviewedSampleMatchCount)} sample match${unreviewedSampleMatchCount === 1 ? '' : 'es'} not yet reviewed`;
+  const summary =
+    `${verdictLabel} — ${String(passRatePct)}% of own examples pass (${String(totalOwnPassed)}/${String(totalOwnExamples)}); ` +
+    `${sampleMatchesClause}; ${reasons.join('; ')}`;
 
   return {
     verdict,
@@ -233,10 +252,20 @@ function buildOverallVerdict(results: Results, rules: readonly RuleReport[]): Ov
     lowConfidenceRuleCount: lowConfidence.length,
     rejectedRuleCount: rejected.length,
     constructsWithoutUsableRule,
+    unreviewedSampleMatchCount,
   };
 }
 
-/** Builds the full report model from a Results file (WP-05), optionally enriched with the Rule Set and examples. */
+function buildLexical(ruleSet: RuleSet): LexicalSettingsView {
+  return {
+    fileMatchers: ruleSet.fileMatchers,
+    ...(ruleSet.lineComment !== undefined ? { lineComment: ruleSet.lineComment } : {}),
+    ...(ruleSet.blockComment !== undefined ? { blockComment: ruleSet.blockComment } : {}),
+    ...(ruleSet.stringDelimiters !== undefined ? { stringDelimiters: ruleSet.stringDelimiters } : {}),
+  };
+}
+
+/** Builds the full report model from a Results file (WP-05), optionally enriched with the Rule Set, examples, `synthesis.json` and a fresh Skill-file hash check. */
 export function buildReport(results: Results, options: BuildReportOptions = {}): Report {
   const rules = results.rules.map((rule) => buildRuleReport(rule, options.ruleSet, options.examplesById));
   const coverage = buildCoverage(rules);
@@ -253,5 +282,10 @@ export function buildReport(results: Results, options: BuildReportOptions = {}):
     rules,
     sampleWarnings: results.sampleWarnings,
     ...(options.ruleSet !== undefined ? { sourceSkills: options.ruleSet.sourceSkills } : {}),
+    ...(options.ruleSet !== undefined ? { lexical: buildLexical(options.ruleSet) } : {}),
+    ...(options.synthesis !== undefined ? { synthesis: buildSynthesisView(options.synthesis) } : {}),
+    ...(options.ruleSet !== undefined && options.currentSourceSkills !== undefined
+      ? { skillHashMismatches: findSkillHashMismatches(options.ruleSet.sourceSkills, options.currentSourceSkills) }
+      : {}),
   };
 }

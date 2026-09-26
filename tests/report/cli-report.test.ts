@@ -1,10 +1,27 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProgram } from '../../src/cli/index.js';
+import { ingestSkills } from '../../src/ingest/index.js';
 import { runRules } from '../../src/runner/index.js';
+import type { SynthesisReport } from '../../src/synth/index.js';
 import { cloneRuleSet, fixtureExamples, loadFixtureRuleSet, loadSampleFiles, RULESET_PATH, SKILLS_DIR } from './helpers.js';
+
+function fakeSynthesis(): SynthesisReport {
+  return {
+    languageId: 'toylang',
+    compilerVersion: '0.1.0',
+    generatedAt: '2026-09-26T00:00:00.000Z',
+    status: 'completed',
+    maxAttemptsPerConstruct: 3,
+    lexical: { status: 'accepted', attempts: [] },
+    constructs: [{ constructId: 'db-read', ruleType: 'db_read', status: 'validated', ruleId: 'db-read', attempts: [] }],
+    summary: { constructs: 1, validated: 1, rejected: 0, notJustified: 0, skipped: 0, notAttempted: 0 },
+    usage: { inputTokens: 1, outputTokens: 1, calls: 1 },
+    ingestDiagnostics: [],
+  };
+}
 
 let out: string[];
 let err: string[];
@@ -109,5 +126,55 @@ describe('lsc report', () => {
     expect(text).toContain('REJECTED');
     expect(text).toContain('db-read');
     expect(text).toContain('read-03');
+  });
+
+  it('--synthesis adds each construct\'s synthesis outcome and reasons', async () => {
+    const synthesisFile = join(tmp, 'synthesis.json');
+    writeFileSync(synthesisFile, JSON.stringify(fakeSynthesis()));
+    expect(await runCli(resultsFile, '--synthesis', synthesisFile)).toBe(0);
+    const text = out.join('');
+    expect(text).toContain('## Synthesis');
+    expect(text).toContain('db-read');
+    expect(text).toMatch(/does not record provider, model or recording origin/);
+  });
+
+  it('an invalid --synthesis file is rejected with a readable error', async () => {
+    const synthesisFile = join(tmp, 'synthesis.json');
+    writeFileSync(synthesisFile, JSON.stringify({ not: 'a synthesis report' }));
+    expect(await runCli(resultsFile, '--synthesis', synthesisFile)).toBe(1);
+    expect(err.join('')).toContain('is not a valid synthesis.json');
+  });
+
+  // The frozen fixture Rule Set's own `sourceSkills` paths are prefixed "skills/" (contract/fixtures/toylang.ruleset.json),
+  // while `ingestSkills(skillsDir).sourceSkills` — and contract/CONTRACT.md's definition ("relative to the Skill
+  // directory", i.e. --skills-dir itself) — give bare names ("module.md"). That mismatch is a pre-existing
+  // inconsistency in a frozen, contract-architect-owned fixture (see this package's WP-07 completion note, open
+  // question), not something to paper over here: these two tests build a Rule Set whose `sourceSkills` follow the
+  // documented convention instead, so the check is exercised the way `lsc compile`'s own output would be.
+  function ruleSetWithRealSourceSkillPaths() {
+    const ruleSet = cloneRuleSet();
+    ruleSet.sourceSkills = ingestSkills(SKILLS_DIR).sourceSkills;
+    return ruleSet;
+  }
+
+  it('--ruleset + --skills-dir warns (stderr and report) when a Skill file hash has drifted from the Rule Set', async () => {
+    const rulesetFile = join(tmp, 'toylang.ruleset.json');
+    writeFileSync(rulesetFile, JSON.stringify(ruleSetWithRealSourceSkillPaths()));
+    const skillsDir = join(tmp, 'toylang-skills');
+    cpSync(SKILLS_DIR, skillsDir, { recursive: true });
+    writeFileSync(join(skillsDir, 'module.md'), '# edited after the Rule Set was compiled\n');
+
+    expect(await runCli(resultsFile, '--ruleset', rulesetFile, '--skills-dir', skillsDir)).toBe(0);
+    expect(err.join('')).toContain('WARNING');
+    expect(err.join('')).toMatch(/module\.md/);
+    expect(out.join('')).toMatch(/module\.md/); // also visible in the rendered report, not stderr-only
+  });
+
+  it('--ruleset + --skills-dir with unchanged Skill files warns of nothing', async () => {
+    const rulesetFile = join(tmp, 'toylang.ruleset.json');
+    writeFileSync(rulesetFile, JSON.stringify(ruleSetWithRealSourceSkillPaths()));
+    expect(await runCli(resultsFile, '--ruleset', rulesetFile, '--skills-dir', SKILLS_DIR)).toBe(0);
+    expect(err.join('')).not.toContain('WARNING');
+    expect(out.join('')).toContain('every Skill file hash still matches');
   });
 });
