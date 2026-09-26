@@ -213,3 +213,11 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
   Then a targeted re-review, the regenerated reports, and the G2 question again. This round goes beyond the two-round limit in docs/ORCHESTRATION.md §5, at the owner's request.
 - **Reason:** The reviewer judged the report "nearly, but not yet" sufficient to decide whether a Rule Set can be trusted.
 - **Affects:** WP-07 only.
+
+## D28 — Plain-language summary and readability pass for the report
+
+- **Date:** 2026-09-26
+- **Author:** orchestrator, recording the project owner's request after reading the G2 reports
+- **Decision:** The owner asked for the reports to be easier to understand, with a summary at the beginning, and to be told what needs to be done. `report-builder` adds a plain-language summary at the top of both formats and a "What to do next" list worked out from the results. It also simplifies wording in the verdict and coverage areas, keeping the detailed sections. The four remaining findings from the targeted G2-round review go into the same change. The orchestrator confirms the one-line change report-builder made to `tests/synth/compile-cli.test.ts` in 169d77c (it followed directly from the D27 A5 wording change).
+- **Reason:** The owner's request at G2.
+- **Affects:** WP-07 (src/report/). G2 stays open until the owner has seen the result.
