@@ -229,3 +229,29 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
 - **Decision:** The project owner approved G2: the validation report (with the D28 summary and "What to do next" list) is understandable enough to decide whether a Rule Set can be trusted. The reports judged were generated from hand-written recordings (D25 item 1). The owner saw the readability pass after the orchestrator had verified it (checks green, summaries read), without a separate reviewer round.
 - **Reason:** Human gate G2 (docs/ORCHESTRATION.md §4).
 - **Affects:** Wave 4 (WP-10) may start. WP-10 must drop `status: "rejected"` rules and never export a `0.0.0-draft` Rule Set (D25 item 5). Items held for G4 are listed in D19, D25 and the G2 summary.
+
+## D30 — Contract 1.0.4: content-version rules completed; drafts are never delivered
+
+- **Date:** 2026-09-26
+- **Author:** `contract-architect` (WP-10)
+- **Decision:**
+  a. contract/CONTRACT.md §3 now classifies the changes 1.0.3 left open. A `fileMatchers` glob removed is **major** (files are no longer scanned, like a removed rule), and a glob added is **minor**. `lineComment`, `blockComment` and `stringDelimiters` changes are **patch**, and so is an engine switch with the same meaning (`exact` ↔ `regex`). Metadata-only changes are **patch**: `confidence`, `sourceEvidence`, `tests`, a Skill file in `sourceSkills` edited, added or removed, and rule or glob order. Capture roles "remapped" means a role mapped to a different group name (major, as §3 already said).
+  b. Only `validated` rules are compared. A rule that is `rejected` in the new compile counts as removed (major). `searchStrings` absent equals `false`, and key order never counts. `compiledAt`, `compilerVersion`, `contractVersion` and `version` are not compared. If nothing else changed, the previous version is kept and the previous file is rewritten unchanged, so one `languageId` + `version` means one content.
+  c. A `confidence` change is a patch, although a change to or from `low` adds or removes `uncertainties` records.
+  d. §3 and §7 say that a draft (`0.0.0-draft`, may hold rejected rules, D24) is never delivered. An exported Rule Set always has `major.minor.patch` with major ≥ 1, no suffix, and only validated rules. A consumer *should* refuse a pre-release or 0.x `version`. This is advice, not a validation rule: drafts must keep validating for `lsc test` and `lsc report`.
+  e. **Version: patch bump, 1.0.3 → 1.0.4.** `CONTRACT_VERSION` bumped, `contract/rule-set.schema.json` re-exported (only the version strings change), §8 history row added. `tests/contract/fixtures.test.ts` and `tests/contract/validate-ruleset-cli.test.ts` updated for the new version literal.
+- **Reason:** WP-10 must assign versions for every difference between two Rule Sets, and Navigator decides from the bump whether an update is safe to adopt automatically, so the classification belongs in the contract, not only in code. a follows the plan's analogy: losing output is major, gaining output is minor, refinement is patch. c: uncertainty records flag trust; they do not change what the other records mean. No file becomes valid or invalid, so this is a patch (§2: documentation only).
+- **Affects:** Navigator (read §3 before auto-adopting updates; tell it with the new schema file, §8 item 5). `src/release/diff.ts` implements the table. Open for the owner: whether a `confidence` change to `low` should instead be minor or major (c), and whether a removed glob should be major (a).
+
+## D31 — Export and recompile conventions (WP-10)
+
+- **Date:** 2026-09-26
+- **Author:** `contract-architect` (WP-10)
+- **Decision:**
+  a. `lsc export <draft-ruleset> --out <file> [--previous <file>] [--changelog <file>]`, as in the brief. The command name matches the report's wording ("export the Rule Set with `lsc export`"). `--changelog` is an addition, with default `CHANGELOG.md` next to `--out`. Each entry is headed `## <languageId> <version> (<date of compiledAt>)`, newest first, and the same heading is never written twice.
+  b. If `--out` exists, `--previous` is required. A forgotten `--previous` would otherwise restart at `1.0.0` and overwrite a later version. `--previous` must be an exported Rule Set: a release version, no rejected rules, the same language.
+  c. A draft with no validated rule is refused (nothing to export). `compiledAt` and `compilerVersion` are kept from the draft (they describe the compile that produced the rules). `contractVersion` is set to the current `CONTRACT_VERSION`.
+  d. Reuse on recompile (`src/release/reuse.ts`) compares Skill hashes against the previous **exported** Rule Set. A construct depends on the file with its section plus every file with an inline example of it. The lexical settings depend on the general Skill files. A reusable rule is always re-tested by the runner on the current examples and lexical settings, because sidecar and `reviews.yaml` examples (D9) change without any Skill hash changing. A rule that now fails is re-synthesised. A construct that was rejected or not justified last time has no exported rule, so it is always re-synthesised.
+  e. Wiring reuse, `--force` and `--export` into `compileLanguage` / `lsc compile` needs changes in `src/synth/` and `src/cli/commands/compile.ts` (owner `llm-integrator`). WP-10 lists those deliverables but does not own the folders. The proposed interface is in `src/release/README.md`; the request is in the WP-10 completion note.
+- **Reason:** Safety against overwriting a delivered version (b); honest re-testing (d); folder ownership (docs/ORCHESTRATION.md §2) (e).
+- **Affects:** `llm-integrator` (compile wiring), `report-builder` (a synthesis.json "reused" marker would need showing), G3.

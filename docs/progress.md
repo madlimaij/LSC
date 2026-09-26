@@ -12,7 +12,7 @@
 | WP-07 | Report + review CLI | report-builder | WP-05 | done (G2 approved) |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | done (reviewed wave 3, round 2); real run deferred to G4 (D25) |
-| WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | in progress |
+| WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | export done; compile wiring with llm-integrator in progress |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
 | WP-12 | Extra engines (conditional) | engine-builder | WP-11 | not started |
 
@@ -498,3 +498,44 @@ f. `explainConfidence`'s reason string starts with the level word (`"high — ..
 **Open questions:**
 - Whether `tests/synth/compile-cli.test.ts` (llm-integrator's) should eventually assert on the new structured `overall` fields (or the new Summary) directly, now that the single bold sentence it parses is presented to a reader only inside a collapsed disclosure — it still works today, but a future report change that removed the `<details>` compatibility shim would break it again with no visible test failure pointing at `src/report/`.
 - Carried over: should `--format json` ever become a stable contract? Review still has no prompt for editing captures.
+
+### WP-10 — Versioning, recompile and export (`contract-architect`, 2026-09-26)
+
+**What was built**
+- `src/release/`: `diff.ts` (`diffRuleSets`: rules added, removed, renamed, type, captures, pattern, confidence, provenance, tests, order; `fileMatchers`, comment and string markers, `sourceSkills`; each change carries its bump), `content-version.ts` (`nextVersion`, `isReleaseVersion`, first export `1.0.0`), `changelog.ts` (entry rendering, newest-first insertion, no duplicate entries), `export.ts` (`exportRuleSet` pure, `exportFiles` file-level), `reuse.ts` (`planReuse`, `reuseConstruct`), `index.ts`, `README.md`.
+- `src/cli/commands/export.ts`: `lsc export <draft-ruleset> --out <file> [--previous <file>] [--changelog <file>]`.
+- Contract 1.0.4 (D30): `contract/CONTRACT.md` §3 (full bump table, draft rule), §7 (`version` row), §8 history; `src/contract/version.ts`; `contract/rule-set.schema.json` re-exported (only version strings changed); `tests/contract/fixtures.test.ts` and `tests/contract/validate-ruleset-cli.test.ts` version literals.
+- Tests: `tests/release/{diff,export,reuse,recompile}.test.ts` (52 tests), `tests/release/helpers.ts`, `tests/release/scenarios.ts`.
+- `docs/DECISIONS.md`: D30 (contract 1.0.4), D31 (export and recompile conventions).
+
+**Acceptance criteria**
+- *Changing one toylang Skill file and recompiling (via recordings) produces a new version, re-synthesises only that construct, and the changelog names the change*: **partly met**.
+  - New version and changelog: met. `recompile.test.ts` › "changing one Skill file (db-write.md) and recompiling via recordings gives a new version, and the CHANGELOG names the change": `lsc compile` (FakeProvider) → `lsc export` 1.0.0 → edit db-write.md → `lsc compile` → `lsc export --previous` 1.0.1. The entry lists "`db-write`: pattern changed (engine exact → regex)" and "Skill files edited: db-write.md", and nothing else.
+  - "Re-synthesises only that construct": the reuse logic is met at API level. `reuse.test.ts` › "after changing db-write.md, only the db-write construct reaches the provider; every other rule is reused" (the provider is asked only `['db-write']`), plus the `planReuse`/`reuseConstruct` tests. It is **not met through `lsc compile`**, because wiring it needs `src/synth/compile.ts` and `src/cli/commands/compile.ts`, which this WP does not own (request below).
+- *Removing a construct → major; adding one → minor; pattern-only change → patch (each tested)*: **met**. `recompile.test.ts` › "removing a construct produces a major bump" (1.0.0 → 2.0.0), "adding a construct produces a minor bump" (→ 1.1.0), and the db-write test above (→ 1.0.1). Unit level: `diff.test.ts` has one test per classification row.
+- *An exported Rule Set passes `lsc validate-ruleset` and `lsc test` offline*: **met**. `recompile.test.ts` › "validates and tests clean against the toylang examples and sample": exit 0 for both, results `ok: true`, `ruleSetVersion: 1.0.0`.
+- Brief deliverable "`lsc compile` calls export at the end when `--export` is given": **not met** (same ownership reason). `exportFiles` is ready for it.
+- D25 item 5 / D29 (drop rejected rules; never deliver a draft): **met**. `export.test.ts` › "first export: version 1.0.0, only validated rules…", "never delivers the draft version…", "refuses a draft as the previous Rule Set…"; `recompile.test.ts` › "a rule rejected in the draft is not exported…".
+- `npm run typecheck`, `npm run lint`: clean. `npm test`: 69 files, 716 tests passed.
+
+**Deviations from the brief**
+1. **Compile integration not done (ownership conflict).** The brief lists reuse in compile, `--force` and `lsc compile --export`, but it owns only `src/release/` and `export.ts`. The orchestrator's instructions and docs/ORCHESTRATION.md §2 forbid editing `src/synth/` and `compile.ts`. Everything those files need is in `src/release/` (interface in `src/release/README.md`).
+2. **Contract bumped to 1.0.4 (D30).** Plan §5.1 does not classify `fileMatchers`, comment and string markers, metadata-only changes or order. Navigator auto-adopts by bump, so the classification went into CONTRACT.md §3. This is a patch because validity is unchanged.
+3. **Additions to the command line:** `--changelog <file>`. Also refusals: an existing `--out` needs `--previous`, a draft cannot be `--previous`, and an export with no validated rule is refused (D31).
+4. **Unchanged content keeps its version** and the previous file is rewritten byte-identical, with no CHANGELOG entry.
+5. The first-export CHANGELOG lists every rule as added.
+
+**Requests**
+- To `llm-integrator` (src/synth, src/cli/commands/compile.ts, per src/release/README.md):
+  - (a) `CompileOptions.reuse` hook: given lexical settings, skip `synthesizeLexical`; call a construct callback before `synthesizeConstruct`.
+  - (b) Mark reused results in `synthesis.json` (e.g. `lexical.status: "reused"`, `ConstructSynthesis.reusedFrom`).
+  - (c) `lsc compile --previous <file> --force --export <file>` using `planReuse`/`reuseConstruct`/`exportFiles`.
+  - After that, an end-to-end CLI test for "re-synthesises only that construct" (snippet log shows only db-write requests) can reuse `tests/release/scenarios.ts`.
+- To `report-builder`: once (b) exists, show "reused from <version>, no model call" per construct. The existing wording "export the Rule Set with `lsc export`" matches the command name; no change needed.
+- To the orchestrator: `src/cli/commands/README.md` does not describe `lsc compile` or an `lsc report` command line, so there was nothing to update there. Navigator must receive contract 1.0.4 (CONTRACT.md §3) with the schema file (§8 item 5).
+
+**Open questions**
+- D30 a/c: should a `confidence` drop to `low` (which adds `uncertainties` records) be more than a patch? Should a removed `fileMatchers` glob really be major?
+- CONTRACT.md §3 "remapped" makes a pure group rename (same roles, same output) a major bump. That is conservative; the owner may prefer patch, but the diff cannot prove the output is the same.
+- A construct that was rejected or not justified last time has no exported rule, so every recompile re-synthesises it (model calls with an unchanged Skill file). Acceptable, or should the previous draft/synthesis.json also be an input?
+- When a general Skill file changes, the lexical settings are re-synthesised but construct rules are still reused if they pass under the new settings. Should a lexical change force every construct to be re-synthesised instead?
