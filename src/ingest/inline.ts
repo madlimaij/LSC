@@ -60,7 +60,49 @@ export function extractInline(root: Root, skillPath: string): InlineExtractionRe
   const slugs = new SlugCounter();
   const stack: HeadingInfo[] = [];
 
-  const children = root.children;
+  walk(root.children, skillPath, stack, slugs, headings, examples, diagnostics, constructAnchors);
+
+  return { examples, diagnostics, headings, constructAnchors };
+}
+
+/**
+ * Nodes whose `children` are ordinary block content (mdast `BlockContent |
+ * DefinitionContent`, a subset of `RootContent`): list items, list
+ * containers, blockquotes and footnote definitions. Fenced examples inside
+ * any of these (nested arbitrarily deep, e.g. a negative example inside a
+ * blockquote inside a list item) are found by recursing into their children
+ * the same way as the document root, so provenance (file, line, the
+ * enclosing heading's anchor) stays correct: the heading stack and the
+ * "next sibling must be the expect block" rule both apply within whichever
+ * children array the code fence sits in.
+ *
+ * Node types with only inline/phrasing children (paragraphs, emphasis,
+ * links, table cells, headings themselves) are deliberately not recursed
+ * into: they cannot contain a fenced code block per CommonMark/GFM, so there
+ * is nothing to find and nothing is silently dropped.
+ */
+function blockChildrenOf(node: RootContent): RootContent[] | undefined {
+  switch (node.type) {
+    case 'blockquote':
+    case 'list':
+    case 'listItem':
+    case 'footnoteDefinition':
+      return (node as { children: RootContent[] }).children;
+    default:
+      return undefined;
+  }
+}
+
+function walk(
+  children: RootContent[],
+  skillPath: string,
+  stack: HeadingInfo[],
+  slugs: SlugCounter,
+  headings: HeadingInfo[],
+  examples: Example[],
+  diagnostics: ExampleLoadError[],
+  constructAnchors: Map<string, ConstructAnchor>,
+): void {
   let i = 0;
   while (i < children.length) {
     const node = children[i];
@@ -91,10 +133,13 @@ export function extractInline(root: Root, skillPath: string): InlineExtractionRe
       continue;
     }
 
+    const nested = blockChildrenOf(node);
+    if (nested !== undefined) {
+      walk(nested, skillPath, stack, slugs, headings, examples, diagnostics, constructAnchors);
+    }
+
     i += 1;
   }
-
-  return { examples, diagnostics, headings, constructAnchors };
 }
 
 function isExpectFence(node: RootContent | undefined): node is Code {

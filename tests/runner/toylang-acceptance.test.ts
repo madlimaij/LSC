@@ -106,9 +106,38 @@ describe('toylang fixture Rule Set against the sample repository (SPEC.md §7)',
     );
   });
 
-  it('S10: CRLF sample file (legacy/dos_export.tl) is scanned with the same result as LF', () => {
-    const results = scanSample();
-    const moduleDecl = results.rules.find((r) => r.ruleId === 'module-declaration');
+  it('S10: CRLF sample file (legacy/dos_export.tl) is scanned with the same result as an LF-converted copy of the same text', () => {
+    const ruleSet = loadFixtureRuleSet();
+    const examples = ingestSkills(SKILLS_DIR).constructs.flatMap((c) => c.examples);
+    const crlfFiles = loadSampleFiles();
+    const dosExport = crlfFiles.find((f) => f.path === 'legacy/dos_export.tl');
+    if (dosExport === undefined) throw new Error('expected legacy/dos_export.tl in the sample repository');
+    expect(dosExport.content).toContain('\r\n');
+
+    const lfFiles = crlfFiles.map((f) =>
+      f.path === 'legacy/dos_export.tl' ? { ...f, content: f.content.replace(/\r\n/g, '\n') } : f,
+    );
+
+    const crlfResults = runRules(ruleSet, examples, crlfFiles);
+    const lfResults = runRules(ruleSet, examples, lfFiles);
+
+    const matchesFor = (results: ReturnType<typeof runRules>) =>
+      results.rules.flatMap((rule) =>
+        rule.sampleMatches
+          .filter((m) => m.file === 'legacy/dos_export.tl')
+          .map((m) => ({ ruleId: rule.ruleId, line: m.line, column: m.column, captures: m.captures, enclosingSymbol: m.enclosingSymbol })),
+      );
+
+    const crlfMatches = matchesFor(crlfResults);
+    const lfMatches = matchesFor(lfResults);
+
+    expect(crlfMatches.length).toBeGreaterThan(0);
+    expect(crlfMatches).toEqual(lfMatches);
+    for (const match of crlfMatches) {
+      for (const value of Object.values(match.captures)) expect(value).not.toContain('\r');
+    }
+
+    const moduleDecl = crlfResults.rules.find((r) => r.ruleId === 'module-declaration');
     expect(moduleDecl?.sampleMatches.some((m) => m.file === 'legacy/dos_export.tl' && m.line === 1)).toBe(true);
   });
 });

@@ -1,16 +1,23 @@
 /**
  * Line handling shared by every engine (contract/CONTRACT.md §6.2).
  *
- * Lines are 1-based and separated by `\n`. A `\r` immediately before a `\n`
- * is not part of the line; the normaliser below removes it up front (by
- * turning every `\r\n` into `\n`) so every later step — masking, per-line
+ * Lines are 1-based and separated by `\n`. A `\r` at the end of a line is not
+ * part of the line; the normaliser below removes it up front (by turning
+ * every `\r\n` into `\n`, and also stripping a trailing `\r` that ends the
+ * file with no following `\n`) so every later step — masking, per-line
  * matching, whole-text matching, offset-to-line/column conversion — works on
  * one consistent text and never re-derives line numbers differently.
  */
 
-/** Turns `\r\n` into `\n`. Lone `\r` (old Mac line endings) is left alone: the contract only specifies `\r\n`. */
+/**
+ * Turns `\r\n` into `\n`, and strips a lone `\r` at the very end of the
+ * text (the last line of a file with no trailing `\n`). Lone `\r` elsewhere
+ * (old Mac line endings mid-file) is left alone: the contract only specifies
+ * line ends, and only `\r\n` and end-of-file `\r` are unambiguously line ends
+ * here since lines are otherwise separated by `\n`.
+ */
 export function normalizeLineEndings(text: string): string {
-  return text.replace(/\r\n/g, '\n');
+  return text.replace(/\r\n/g, '\n').replace(/\r$/, '');
 }
 
 /** Splits already-normalised text into lines (no `\r`, separated by `\n`). */

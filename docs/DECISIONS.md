@@ -104,3 +104,15 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
 - **Decision:** A construct's anchor is the heading enclosing the first inline example (document order) that declares it; nested sub-headings (e.g. `### Traps`) belong to the parent construct's section. Sidecar or `reviews.yaml` examples for a construct that no Skill file documents are dropped with an "example without construct" diagnostic rather than becoming a construct of their own.
 - **Reason:** WP-09 needs one stable anchor per construct, and every example must be traceable to documentation, not only to a directory name.
 - **Affects:** WP-09 (anchors in `sourceEvidence`), WP-00 (real Skill files must document every construct that has examples).
+
+## D19 — Owner decisions after the wave 2 review
+
+- **Date:** 2026-09-26
+- **Author:** orchestrator, recording the project owner's answers
+- **Decision:**
+  a. **Cross-construct negatives (reviewer Q-C).** Every rule is still applied to every negative example of every construct (D16 h), and a match on any of them fails the rule and blocks `high`/`medium`. But `tests.passed`/`tests.failed`, the pass rate and the "≥2 negatives" threshold of plan §6.3 use only the construct's own examples (as coverage already does). Cross-construct negative failures are reported separately. The fixture's `tests` counts and SPEC §8 ("own examples") stay as they are.
+  b. **Matches outside any open scope (reviewer Q-A).** A relation, db-access or config-ref match with no enclosing definition uses as its source the name of the `module_declaration` matched in the same file (the last one before the match), or, if none, the file itself. Such matches produce normal records, not `missing-source-symbol` uncertainties.
+  c. **Unnamed definitions (reviewer Q-B).** A definition match whose `name` capture is missing or empty produces an uncertainty and opens no scope; matches inside it keep the outer scope.
+  d. **Recording guard (WP-08 question a).** `lsc compile` refuses recording mode when `LSC_REAL_INPUTS` is set or any input lies outside `fixtures/toylang/`.
+- **Reason:** Owner answers to the wave 2 review questions.
+- **Affects:** b and c clarify contract/CONTRACT.md §4/§6.6/§9 (Q3, Q5 and the WP-04 question) — `contract-architect` documents them and decides the version impact under D12; `engine-builder` implements a–c in `src/engines/` and `src/runner/`; WP-09 implements d. Still open for G4: WP-08 b (mandatory `baseUrl`), WP-08 c (keep `responseText` in the snippet log), D18 impact on real inputs, reviewer Q-D (same-type rules and each other's negatives).

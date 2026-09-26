@@ -86,4 +86,14 @@ describe('lsc test', () => {
     expect(await runCli(join(tmp, 'missing.json'), SKILLS_DIR)).toBe(1);
     expect(err.join('')).toMatch(/^ERROR: cannot read .*missing\.json/);
   });
+
+  it('an empty skills dir (no examples for any rule) fails every rule and exits with code 1', async () => {
+    const emptySkillsDir = join(tmp, 'empty-skills');
+    expect(await runCli(RULESET, emptySkillsDir)).toBe(1);
+    const text = out.join('');
+    expect(text).toContain('FAILED: at least one rule failed an example');
+    expect(text).not.toContain('OK: every rule passed its examples');
+    expect(text).not.toMatch(/^ {2}PASS/m);
+    expect(text).toContain('none (passes no positive example: rejected)');
+  });
 });

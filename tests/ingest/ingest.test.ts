@@ -1,11 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { formatLoadError, ingestSkills } from '../../src/ingest/index.js';
+import { formatLoadError, ingestSkills, TRUNCATION_MARKER } from '../../src/ingest/index.js';
 
 const FIXTURES = resolve(import.meta.dirname, 'fixtures');
 const TOYLANG_SKILLS = resolve(import.meta.dirname, '../../fixtures/toylang/skills');
+const TOYLANG_RULESET = resolve(import.meta.dirname, '../../contract/fixtures/toylang.ruleset.json');
 
 function diagnosticsOf(fixture: string): string[] {
   const dir = join(FIXTURES, fixture, 'skills');
@@ -56,12 +57,32 @@ describe('ingestSkills: toylang (acceptance criterion 1)', () => {
       'module-declaration': 'module_declaration',
       'proc-definition': 'symbol_definition',
     });
+    // Exact counts from fixtures/toylang/SPEC.md §5 (74 examples in total: 50 positive, 24 negative).
+    const expectedCounts: Record<string, { positive: number; negative: number }> = {
+      'module-declaration': { positive: 6, negative: 3 },
+      'proc-definition': { positive: 6, negative: 3 },
+      call: { positive: 7, negative: 3 },
+      include: { positive: 6, negative: 3 },
+      'db-read': { positive: 7, negative: 3 },
+      'db-write': { positive: 6, negative: 3 },
+      'config-flag': { positive: 6, negative: 3 },
+      'entry-point': { positive: 6, negative: 3 },
+    };
+    let totalPositive = 0;
+    let totalNegative = 0;
     for (const construct of result.constructs) {
       const positive = construct.examples.filter((e) => e.polarity === 'positive').length;
       const negative = construct.examples.filter((e) => e.polarity === 'negative').length;
-      expect(positive, `${construct.id} positive examples`).toBeGreaterThanOrEqual(5);
-      expect(negative, `${construct.id} negative examples`).toBeGreaterThanOrEqual(2);
+      const expected = expectedCounts[construct.id];
+      expect(expected, `no expected count for construct "${construct.id}"`).toBeDefined();
+      expect(positive, `${construct.id} positive examples`).toBe(expected?.positive);
+      expect(negative, `${construct.id} negative examples`).toBe(expected?.negative);
+      totalPositive += positive;
+      totalNegative += negative;
     }
+    expect(totalPositive, 'total positive examples').toBe(50);
+    expect(totalNegative, 'total negative examples').toBe(24);
+    expect(totalPositive + totalNegative, 'total examples').toBe(74);
   });
 
   it('gives every construct a stable anchor into its own Skill file', () => {
@@ -126,8 +147,59 @@ describe('ingestSkills: diagnostics have a triggering fixture each', () => {
   });
 
   it('every fixture directory under tests/ingest/fixtures is exercised by a test', () => {
-    const dirs = ['example-without-construct', 'orphan-expect-block', 'duplicate-id', 'no-positive-example', 'missing-info-keys', 'malformed-expect-yaml', 'conflicting-types', 'valid'];
+    const dirs = ['example-without-construct', 'orphan-expect-block', 'duplicate-id', 'no-positive-example', 'missing-info-keys', 'malformed-expect-yaml', 'conflicting-types', 'valid', 'nested-examples'];
     for (const dir of dirs) expect(() => ingestSkills(join(FIXTURES, dir, 'skills'))).not.toThrow();
+  });
+});
+
+describe('ingestSkills: IngestOptions.proseCharLimit caps a construct\'s prose', () => {
+  it('leaves prose under the default limit unchanged', () => {
+    const result = ingestSkills(TOYLANG_SKILLS);
+    const call = result.constructs.find((c) => c.id === 'call');
+    expect(call?.prose.length).toBeLessThanOrEqual(4000);
+    expect(call?.prose).not.toContain('[truncated]');
+  });
+
+  it('a small proseCharLimit truncates every construct\'s prose and appends the marker', () => {
+    const limit = 50;
+    const result = ingestSkills(TOYLANG_SKILLS, { proseCharLimit: limit });
+    expect(result.diagnostics).toEqual([]);
+    for (const construct of result.constructs) {
+      expect(construct.prose.length, `${construct.id} prose length`).toBe(limit + TRUNCATION_MARKER.length);
+      expect(construct.prose.endsWith(TRUNCATION_MARKER), `${construct.id} prose should end with the truncation marker`).toBe(true);
+      expect(construct.prose.startsWith(construct.prose.slice(0, limit))).toBe(true);
+    }
+  });
+
+  it('a proseCharLimit large enough for every section leaves prose untouched (no marker)', () => {
+    const result = ingestSkills(TOYLANG_SKILLS, { proseCharLimit: 100_000 });
+    for (const construct of result.constructs) {
+      expect(construct.prose).not.toContain('[truncated]');
+    }
+  });
+});
+
+describe('ingestSkills: examples nested inside lists and blockquotes', () => {
+  it('finds a top-level example, a negative example inside a list item and a negative example inside a blockquote', () => {
+    const result = ingestSkills(join(FIXTURES, 'nested-examples', 'skills'));
+    expect(result.diagnostics).toEqual([]);
+    const say = result.constructs.find((c) => c.id === 'say');
+    expect(say?.examples.map((e) => e.id)).toEqual(['say-01', 'say-neg-list', 'say-neg-quote']);
+    const positive = say?.examples.filter((e) => e.polarity === 'positive').length;
+    const negative = say?.examples.filter((e) => e.polarity === 'negative').length;
+    expect(positive).toBe(1);
+    expect(negative).toBe(2);
+    // Provenance: both nested examples keep their own fence line, not the enclosing list/blockquote's line.
+    const nested = say?.examples.filter((e) => e.id !== 'say-01') ?? [];
+    for (const example of nested) {
+      expect(example.source.kind).toBe('inline');
+      if (example.source.kind === 'inline') {
+        expect(example.source.skill).toBe('greet.md');
+        expect(example.source.line).toBeGreaterThan(1);
+      }
+    }
+    // Both nested examples belong to the heading that encloses them (the "Traps" subsection), same anchor as the top-level one.
+    expect(say?.anchor).toBe('greet.md#saying-hello');
   });
 });
 
@@ -180,5 +252,55 @@ describe('ingestSkills: hashing (acceptance criterion 3)', () => {
     expect(after.constructs.map((c) => c.anchor)).toEqual(beforeAnchors);
     expect(after.constructs.map((c) => c.examples.map((e) => e.id))).toEqual(beforeExampleIds);
     expect(after.diagnostics).toEqual([]);
+  });
+
+  it('in a multi-file directory, changing one character in one Skill file changes only that file\'s hash, and nothing else in the ingest result', () => {
+    dir = mkdtempSync(join(tmpdir(), 'lsc-ingest-multi-'));
+    // Copy the whole toylang Skill directory (9 files) plus its sidecar examples, so
+    // mutating one file is tested against a realistic multi-file tree, not a single file.
+    cpSync(TOYLANG_SKILLS, join(dir, 'skills'), { recursive: true });
+    cpSync(resolve(import.meta.dirname, '../../fixtures/toylang/examples'), join(dir, 'examples'), { recursive: true });
+
+    const before = ingestSkills(join(dir, 'skills'));
+    expect(before.diagnostics).toEqual([]);
+    const hashesBefore = new Map(before.sourceSkills.map((s) => [s.path, s.sha256] as const));
+
+    // Mutate only language-basics.md, which introduces no construct and is not itself
+    // referenced by any anchor, in a place with no example fence or heading.
+    const target = join(dir, 'skills', 'language-basics.md');
+    const original = readFileSync(target, 'utf8');
+    const mutated = original.replace('This page is the starting point', 'THIS PAGE is the starting point');
+    expect(mutated).not.toBe(original);
+    writeFileSync(target, mutated);
+
+    const after = ingestSkills(join(dir, 'skills'));
+    expect(after.diagnostics).toEqual([]);
+
+    // Only language-basics.md's hash changed; every other file's hash is untouched.
+    for (const skill of after.sourceSkills) {
+      if (skill.path === 'language-basics.md') {
+        expect(skill.sha256).not.toBe(hashesBefore.get(skill.path));
+        expect(skill.sha256).toMatch(/^[0-9a-f]{64}$/);
+      } else {
+        expect(skill.sha256, `${skill.path} hash should be unchanged`).toBe(hashesBefore.get(skill.path));
+      }
+    }
+    expect(after.sourceSkills.map((s) => s.path)).toEqual(before.sourceSkills.map((s) => s.path));
+
+    // Full construct and example records (code, expected, source line, anchor, prose) are
+    // untouched: language-basics.md documents no construct, so nothing here can be affected.
+    expect(after.constructs).toEqual(before.constructs);
+  });
+
+  it('every toylang Skill file\'s hash matches the sourceSkills entry in the fixture Rule Set (contract/fixtures/toylang.ruleset.json)', () => {
+    const ruleset = JSON.parse(readFileSync(TOYLANG_RULESET, 'utf8')) as {
+      sourceSkills: { path: string; sha256: string }[];
+    };
+    const known = new Map(ruleset.sourceSkills.map((s) => [s.path.replace(/^skills\//, ''), s.sha256] as const));
+    const result = ingestSkills(TOYLANG_SKILLS);
+    expect(result.sourceSkills.length).toBe(known.size);
+    for (const skill of result.sourceSkills) {
+      expect(skill.sha256, `${skill.path} hash should match contract/fixtures/toylang.ruleset.json`).toBe(known.get(skill.path));
+    }
   });
 });

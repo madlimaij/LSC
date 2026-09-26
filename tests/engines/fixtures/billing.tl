@@ -1,4 +1,5 @@
 MODULE billing
+INCLUDE "common.tl"
 
 PROC calc_total(order_id)
   -- CALL fake_call(x) must be ignored: it's a comment

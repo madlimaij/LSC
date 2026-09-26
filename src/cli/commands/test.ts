@@ -28,8 +28,9 @@ function loadSampleFiles(dir: string): SampleFile[] {
 function printSummary(results: Results, diagnosticCount: number): void {
   process.stdout.write(`Rule Set ${results.languageId} ${results.ruleSetVersion}\n`);
   for (const rule of results.rules) {
-    const status = rule.tests.failed === 0 ? 'PASS' : 'FAIL';
-    const computed = rule.computedConfidence ?? 'none (passes no positive example)';
+    const ruleOk = rule.tests.failed === 0 && rule.missingExampleIds.length === 0 && rule.computedConfidence !== undefined;
+    const status = ruleOk ? 'PASS' : 'FAIL';
+    const computed = rule.computedConfidence ?? 'none (passes no positive example: rejected)';
     process.stdout.write(
       `  ${status}  ${rule.ruleId}  ${String(rule.tests.passed)} passed, ${String(rule.tests.failed)} failed` +
         `  confidence: declared=${rule.declaredConfidence} computed=${computed}` +
@@ -37,6 +38,7 @@ function printSummary(results: Results, diagnosticCount: number): void {
         '\n',
     );
     for (const id of rule.tests.failingExampleIds) process.stdout.write(`      failing example: ${id}\n`);
+    for (const id of rule.missingExampleIds) process.stdout.write(`      missing example (cited in sourceEvidence but not found): ${id}\n`);
   }
   if (results.coverage.ruleTypesMissing.length > 0) {
     process.stdout.write(`No validated rule for: ${results.coverage.ruleTypesMissing.join(', ')}\n`);

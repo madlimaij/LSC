@@ -61,7 +61,13 @@ export function runRules(
   });
 
   const coverage = computeCoverage(ruleSet.rules, examples);
-  const ok = rules.every((rule) => rule.tests.failed === 0);
+  // A rule is only `ok` when it has run every one of its own examples (none
+  // missing from the loaded example set), every test passed, and it passed
+  // at least one positive example (computedConfidence is defined) — a rule
+  // with no evidence at all is `rejected` per plan §6.3, not a silent pass.
+  const ok = rules.every(
+    (rule) => rule.tests.failed === 0 && rule.missingExampleIds.length === 0 && rule.computedConfidence !== undefined,
+  );
 
   return {
     languageId: ruleSet.languageId,

@@ -110,7 +110,13 @@ export const ResultsSchema = z.strictObject({
   coverage: CoverageSchema,
   sampleWarnings: z.array(SampleWarningSchema),
   filesScanned: z.array(z.string()),
-  /** `true` when every rule's `tests.failed` is 0 (CLI exit code, WP-05 brief). */
+  /**
+   * `true` when every rule's `tests.failed` is 0, every one of its own
+   * `sourceEvidence` example ids was found (`missingExampleIds` empty), and
+   * it passed at least one positive example (`computedConfidence` defined —
+   * a rule passing no positive example is `rejected`, plan §6.3). Drives the
+   * CLI exit code (WP-05 brief).
+   */
   ok: z.boolean(),
 });
 

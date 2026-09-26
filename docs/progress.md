@@ -6,9 +6,9 @@
 | WP-01 | Skeleton and tooling | contract-architect | — | done (reviewed wave 1) |
 | WP-02 | Rule Set contract | contract-architect | WP-01 | done (reviewed wave 1) |
 | WP-03 | Example format + toylang | contract-architect | WP-02 | done (reviewed wave 1) |
-| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | review: changes required (round 1 fixes in progress) |
-| WP-05 | Test runner | engine-builder | WP-04 | review: changes required (round 1 fixes in progress; one item awaits owner decision) |
-| WP-06 | Skill ingestion | skill-ingester | WP-03 | review: changes required (round 1 fixes in progress) |
+| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | round 1 fixed; owner-decision changes (D19) in progress |
+| WP-05 | Test runner | engine-builder | WP-04 | round 1 fixed; owner-decision changes (D19) in progress |
+| WP-06 | Skill ingestion | skill-ingester | WP-03 | round 1 fixed; owner-decision changes (D19) in progress |
 | WP-07 | Report + review CLI | report-builder | WP-05 | not started |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | not started |
@@ -226,3 +226,22 @@ Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 - Should `contract-architect` update `fixtures/toylang/SPEC.md` §8 and/or the fixture's per-rule `tests.passed`/`tests.failed` to reflect the cross-construct-negative counting convention (deviation 3), or record the convention in `docs/DECISIONS.md` instead? The runner's own acceptance test (`toylang-acceptance.test.ts`) is the source of truth either way; this only affects the static JSON file and `SPEC.md`'s prose.
 - `contract/CONTRACT.md` and `docs/PLAN.md` do not say whether a rule's cross-construct negatives should include negatives from *every* other construct or only from constructs not already covered by its own `sourceEvidence` (deviation 2's reading: every negative example not already "own"). With one rule per type in the toylang fixture, both readings coincide; a future Rule Set with two rules of the same type could differ. Left to `contract-architect`/`llm-integrator` to confirm before WP-09.
 - No new dependencies needed (RE2 was already a dependency, from WP-01/WP-04).
+
+### Wave 2 review round 1 fixes: WP-04, WP-05, WP-06 (`engine-builder`, `skill-ingester`, 2026-09-26)
+
+*(Written by the orchestrator: the agents' final messages were lost in a container restart. Evidence below was checked directly by the orchestrator.)*
+
+**What was changed:** `src/engines/lines.ts`, `tests/engines/{lines,edge-cases,toylang-snapshot}.test.ts`, `tests/engines/fixtures/billing.tl`, snapshot; `src/runner/{index,results-schema}.ts`, `src/cli/commands/test.ts`, `tests/runner/toylang-acceptance.test.ts`, `tests/cli/test-cmd.test.ts` → `tests/runner/test-cmd.test.ts`; `src/ingest/{inline.ts,README.md}`, `tests/ingest/{ingest,ingest-cli}.test.ts`, `tests/ingest/fixtures/nested-examples/`.
+
+**Reviewer findings**
+- WP-04 #1 trailing `\r` on last line — **fixed** (`lines.ts` strips an end-of-file `\r`; tests in `lines.test.ts`, `edge-cases.test.ts`).
+- WP-04 #2 snapshot lacked INCLUDE — **fixed** (`billing.tl:2` `INCLUDE "common.tl"`; test renamed "…a module-level include has no enclosing symbol"; snapshot re-recorded with current behaviour).
+- WP-05 #1 no evidence still passes — **fixed** (`lsc test` with an empty skills dir prints `FAILED` and exits 1; test "an empty skills dir (no examples for any rule) fails every rule and exits with code 1").
+- WP-05 #2 cross-construct negatives in confidence — **not changed**, awaited owner decision (now D19 a).
+- WP-05 #3 test outside owned folders — **fixed** (moved to `tests/runner/test-cmd.test.ts`).
+- WP-05 #4 S10 test — **fixed** ("S10: CRLF sample file … same result as an LF-converted copy of the same text").
+- WP-06 #1 nested examples dropped — **fixed** (test "finds a top-level example, a negative example inside a list item and a negative example inside a blockquote").
+- WP-06 #2 exact counts — **fixed** (exact per-construct counts from SPEC §5).
+- WP-06 #3 hash test — **fixed** (multi-file test; test against `sourceSkills` hashes in the fixture Rule Set).
+- WP-06 #4 prose cap — **fixed** (`ingest.test.ts` proseCharLimit tests; `ingest-cli.test.ts` "--prose-limit caps every construct's prose length…").
+- Checks: `npm run typecheck`, `npm run lint` clean; `npm test` 45 files, 459 tests passed.

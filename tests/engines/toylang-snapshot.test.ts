@@ -28,14 +28,24 @@ describe('one full toylang file: scan + mapping (WP-04 acceptance criteria)', ()
     expect({ matches, warnings, analysis }).toMatchSnapshot();
   });
 
-  it('resolves every call, read, write, config-ref and include to its enclosing procedure', () => {
+  it('resolves every call, read, write and config-ref inside the procedure to its enclosing procedure; a module-level include has no enclosing symbol', () => {
     const ruleSet = loadToylangRuleSet();
     const validatedRules = ruleSet.rules.filter((r) => r.status === 'validated');
     const rawText = readFileSync(join(here, 'fixtures/billing.tl'), 'utf8');
     const { matches } = scanFile(validatedRules, prepareFile(ruleSet, rawText));
 
+    const includeMatches = matches.filter((m) => m.type === 'include');
+    expect(includeMatches.length).toBeGreaterThan(0);
+    for (const match of includeMatches) {
+      expect(match.enclosingSymbol).toBeUndefined();
+    }
+
     const nonDefinitionMatches = matches.filter(
-      (m) => m.type !== 'module_declaration' && m.type !== 'symbol_definition' && m.type !== 'entry_point',
+      (m) =>
+        m.type !== 'module_declaration' &&
+        m.type !== 'symbol_definition' &&
+        m.type !== 'entry_point' &&
+        m.type !== 'include',
     );
     expect(nonDefinitionMatches.length).toBeGreaterThan(0);
     for (const match of nonDefinitionMatches) {
@@ -49,8 +59,8 @@ describe('one full toylang file: scan + mapping (WP-04 acceptance criteria)', ()
     const rawText = readFileSync(join(here, 'fixtures/billing.tl'), 'utf8');
     const { matches } = scanFile(validatedRules, prepareFile(ruleSet, rawText));
 
-    // Line 4 is a comment containing "CALL fake_call(x)"; line 9 is a string containing "READ hidden_table".
-    expect(matches.some((m) => m.line === 4)).toBe(false);
+    // Line 5 is a comment containing "CALL fake_call(x)"; line 10 is a string containing "READ hidden_table".
+    expect(matches.some((m) => m.line === 5)).toBe(false);
     expect(matches.some((m) => m.type === 'db_read' && m.captures.table === 'hidden_table')).toBe(false);
     expect(matches.some((m) => m.type === 'call' && m.captures.callee === 'fake_call')).toBe(false);
   });

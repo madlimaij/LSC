@@ -48,4 +48,22 @@ describe('lsc ingest', () => {
     expect(payload.constructs.map((c) => c.id)).toContain('call');
     expect(payload.diagnostics).toEqual([]);
   });
+
+  it('--prose-limit caps every construct\'s prose length, including the truncation marker', async () => {
+    const { writes } = captureStdout();
+    const program = await createProgram();
+    await program.parseAsync(['node', 'lsc', 'ingest', TOYLANG_SKILLS, '--json', '--prose-limit', '50']);
+    const payload = JSON.parse(writes.join('')) as { constructs: { proseLength: number }[] };
+    expect(payload.constructs.length).toBeGreaterThan(0);
+    // 50 kept characters + the truncation marker ("\n\n… [truncated]", 15 characters).
+    for (const construct of payload.constructs) expect(construct.proseLength).toBe(50 + '\n\n… [truncated]'.length);
+  });
+
+  it('without --prose-limit, prose stays under the default cap and is not truncated', async () => {
+    const { writes } = captureStdout();
+    const program = await createProgram();
+    await program.parseAsync(['node', 'lsc', 'ingest', TOYLANG_SKILLS, '--json']);
+    const payload = JSON.parse(writes.join('')) as { constructs: { proseLength: number }[] };
+    for (const construct of payload.constructs) expect(construct.proseLength).toBeLessThanOrEqual(4000);
+  });
 });

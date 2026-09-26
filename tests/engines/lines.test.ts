@@ -7,6 +7,11 @@ describe('line handling (contract/CONTRACT.md §6.2)', () => {
     expect(normalizeLineEndings('a\nb')).toBe('a\nb');
   });
 
+  it('strips a trailing \\r on the last line when the file has no final newline', () => {
+    expect(normalizeLineEndings('MODULE a\r')).toBe('MODULE a');
+    expect(normalizeLineEndings('a\r\nb\r')).toBe('a\nb');
+  });
+
   it('splits into lines and computes line-start offsets consistently', () => {
     const text = 'aa\nbbb\n\nc';
     expect(splitLines(text)).toEqual(['aa', 'bbb', '', 'c']);

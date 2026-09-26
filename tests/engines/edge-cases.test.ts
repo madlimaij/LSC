@@ -54,6 +54,18 @@ describe('edge cases', () => {
     expect(matches[0]?.captures.callee).not.toContain('\r');
   });
 
+  it('the last line keeps no trailing \\r when the file ends without a final newline (CONTRACT.md §6.2)', () => {
+    const text = 'MODULE a\r';
+    const file = prepareFile(config, text);
+    const matches = matchRule(moduleRule, file);
+    expect(matches).toEqual([
+      { ruleId: 'module-declaration', type: 'module_declaration', line: 1, column: 1, captures: { name: 'a' } },
+    ]);
+    expect(matches[0]?.captures.name).not.toContain('\r');
+    // Column numbers stay exact: "a" ends right where the (stripped) line ends.
+    expect(file.normalizedText).toBe('MODULE a');
+  });
+
   it('tabs count as separators for the exact engine and as ordinary characters for regex columns', () => {
     const file = prepareFile(config, 'MODULE\ttabbed');
     expect(matchRule(moduleRule, file)).toEqual([
