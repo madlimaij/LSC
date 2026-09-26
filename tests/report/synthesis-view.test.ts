@@ -67,7 +67,7 @@ describe('buildSynthesisView', () => {
 
     expect(view.status).toBe('completed');
     expect(view.usage).toEqual({ inputTokens: 18, outputTokens: 9, calls: 2 });
-    expect(view.providerNote.length).toBeGreaterThan(0); // never silently omitted
+    expect(view.providerNote?.length).toBeGreaterThan(0); // never silently omitted (no modelSource on this fixture)
 
     const dbRead = view.constructs.find((c) => c.constructId === 'db-read');
     expect(dbRead?.status).toBe('validated');

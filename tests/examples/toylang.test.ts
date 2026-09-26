@@ -234,16 +234,17 @@ describe('contract/fixtures/toylang.ruleset.json is aligned with toylang', () =>
     expect(ruleSet.stringDelimiters).toEqual([{ start: '"', end: '"' }]);
   });
 
-  it('sourceSkills lists every Skill file with its current SHA-256', () => {
+  it('sourceSkills lists every Skill file, path relative to the Skill directory, with its current SHA-256', () => {
     const actual = readdirSync(SKILLS)
       .filter((f) => f.endsWith('.md'))
-      .map((f) => ({ path: `skills/${f}`, sha256: createHash('sha256').update(readFileSync(join(SKILLS, f))).digest('hex') }))
+      .map((f) => ({ path: f, sha256: createHash('sha256').update(readFileSync(join(SKILLS, f))).digest('hex') }))
       .sort((a, b) => (a.path < b.path ? -1 : 1));
     const listed = [...ruleSet.sourceSkills].sort((a, b) => (a.path < b.path ? -1 : 1));
     expect(listed, 'a Skill file changed: update its sha256 in the fixture Rule Set').toEqual(actual);
   });
 
   it('each rule cites an existing Skill heading and exactly the examples of one construct of its type', () => {
+    const listedSkills = new Set(ruleSet.sourceSkills.map((s) => s.path));
     const constructs = byConstruct();
     const types = constructTypes();
     const covered = new Set<string>();
@@ -251,7 +252,9 @@ describe('contract/fixtures/toylang.ruleset.json is aligned with toylang', () =>
       expect(rule.sourceEvidence).toHaveLength(1);
       const [evidence] = rule.sourceEvidence;
       if (evidence === undefined) continue;
-      const skill = readFileSync(join(TOYLANG, evidence.skill), 'utf8');
+      // `skill` uses the `sourceSkills` path convention: relative to the Skill directory (contract §7).
+      expect(listedSkills, `${rule.id}: skill ${evidence.skill}`).toContain(evidence.skill);
+      const skill = readFileSync(join(SKILLS, evidence.skill), 'utf8');
       const slugs = [...skill.matchAll(/^#+ (.+)$/gm)].map((m) =>
         (m[1] ?? '').toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '-'),
       );

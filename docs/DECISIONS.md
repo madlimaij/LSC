@@ -186,3 +186,15 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
   5. **For WP-10 (reviewer Q2):** export must drop `status: "rejected"` rules, and a draft Rule Set (`0.0.0-draft`) must never be delivered to Navigator.
 - **Reason:** Owner answers after the wave 3 review; the reviewer judged the report sufficient for "do the rules pass their examples" but not yet for "should this Rule Set be trusted".
 - **Affects:** WP-07, WP-09, WP-10, G2, G4. Still open for G4: reviewer Q1 (single-character markers pass the verbatim check trivially), Q3 (one rule per construct vs. constructs with several forms).
+
+## D26 — Contract 1.0.3: Skill paths relative to the Skill directory; "named scope" wording
+
+- **Date:** 2026-09-26
+- **Author:** `contract-architect`
+- **Decision:**
+  a. `sourceSkills[].path` stays as CONTRACT.md §7 already defined it: relative to the Skill directory (the `<skills-dir>` given to `lsc`), `/` separators, e.g. `module.md`. This is what `ingestSkills` and `lsc compile` already produce. The fixture Rule Set `contract/fixtures/toylang.ruleset.json` and every `contract/fixtures/invalid/*` file stored `skills/module.md` etc. (relative to `fixtures/toylang/`, the Skill directory's parent); they are corrected to `module.md` etc., so `lsc report --ruleset --skills-dir` no longer reports every Skill file as changed against the fixture.
+  b. `sourceEvidence[].skill` uses the same convention as `sourceSkills[].path`, and `anchor` is the heading slug inside that file without `#` (as `lsc compile` writes them). §7 previously said only "provenance"; it now states this. The fields are informational: no §5 rule checks them against `sourceSkills` or the Skill files.
+  c. §4.1 item 4, §6.6 and §9 Q5 say *named* scope where they said "scope" / "open scope": anonymous scopes (1.0.2, D21) are never an enclosing symbol or fallback source. The reference engine already behaves this way.
+  d. Version impact: patch 1.0.3 (CONTRACT.md §2: wording and documentation only; no change to which files are valid or what they mean). `CONTRACT_VERSION` bumped, JSON Schema re-exported (only the version strings change). The fixture Rule Set keeps `contractVersion: "1.0.0"`.
+- **Reason:** a: the contract text was unambiguous and matched the producer; only the fixture was wrong (found by `report-builder` in WP-07). b: the fixture and the producer already agreed except for the prefix; writing the convention down stops the same drift for `skill`. c: wave 2 reviewer finding; 1.0.2 said "innermost named scope" in one sentence of §6.6 but "open scope" elsewhere.
+- **Affects:** Navigator (new schema file and CONTRACT.md 1.0.3 before any Rule Set ships, §8 item 5; no behaviour change). WP-07: `tests/report/cli-report.test.ts` no longer needs to replace the fixture's `sourceSkills` to exercise the hash check. WP-10.

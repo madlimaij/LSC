@@ -270,7 +270,7 @@ _None._
 
 **Provenance**
 
-- \`skills/module.md\` § declaring-a-module — examples: module-01, module-02, module-03, module-04, module-05, module-06, module-neg-01, module-neg-02, module-neg-03
+- \`module.md\` § declaring-a-module — examples: module-01, module-02, module-03, module-04, module-05, module-06, module-neg-01, module-neg-02, module-neg-03
 
 <a id="rule-proc-definition"></a>
 ### \`proc-definition\` (symbol_definition) — OK
@@ -733,7 +733,7 @@ _None._
 
 **Provenance**
 
-- \`skills/procedure.md\` § defining-a-procedure — examples: proc-01, proc-02, proc-03, proc-04, proc-05, proc-06, proc-neg-01, proc-neg-02, proc-neg-03
+- \`procedure.md\` § defining-a-procedure — examples: proc-01, proc-02, proc-03, proc-04, proc-05, proc-06, proc-neg-01, proc-neg-02, proc-neg-03
 
 <a id="rule-call-statement"></a>
 ### \`call-statement\` (call) — OK
@@ -1033,7 +1033,7 @@ _None._
 
 **Provenance**
 
-- \`skills/call.md\` § calling-a-procedure — examples: call-01, call-02, call-03, call-04, call-05, call-06, call-07, call-neg-01, call-neg-02, call-neg-03
+- \`call.md\` § calling-a-procedure — examples: call-01, call-02, call-03, call-04, call-05, call-06, call-07, call-neg-01, call-neg-02, call-neg-03
 
 <a id="rule-include-directive"></a>
 ### \`include-directive\` (include) — OK
@@ -1230,7 +1230,7 @@ _None._
 
 **Provenance**
 
-- \`skills/include.md\` § including-a-file — examples: include-01, include-02, include-03, include-04, include-05, include-06, include-neg-01, include-neg-02, include-neg-03
+- \`include.md\` § including-a-file — examples: include-01, include-02, include-03, include-04, include-05, include-06, include-neg-01, include-neg-02, include-neg-03
 
 <a id="rule-db-read"></a>
 ### \`db-read\` (db_read) — OK
@@ -1526,7 +1526,7 @@ _None._
 
 **Provenance**
 
-- \`skills/db-read.md\` § reading-a-table — examples: read-01, read-02, read-03, read-04, read-05, read-06, read-07, read-neg-01, read-neg-02, read-neg-03
+- \`db-read.md\` § reading-a-table — examples: read-01, read-02, read-03, read-04, read-05, read-06, read-07, read-neg-01, read-neg-02, read-neg-03
 
 <a id="rule-db-write"></a>
 ### \`db-write\` (db_write) — OK
@@ -1737,7 +1737,7 @@ _None._
 
 **Provenance**
 
-- \`skills/db-write.md\` § writing-a-table — examples: write-01, write-02, write-03, write-04, write-05, write-06, write-neg-01, write-neg-02, write-neg-03
+- \`db-write.md\` § writing-a-table — examples: write-01, write-02, write-03, write-04, write-05, write-06, write-neg-01, write-neg-02, write-neg-03
 
 <a id="rule-config-flag"></a>
 ### \`config-flag\` (config_ref) — OK
@@ -1910,7 +1910,7 @@ _None._
 
 **Provenance**
 
-- \`skills/config-flag.md\` § feature-flags — examples: flag-01, flag-02, flag-03, flag-04, flag-05, flag-06, flag-neg-01, flag-neg-02, flag-neg-03
+- \`config-flag.md\` § feature-flags — examples: flag-01, flag-02, flag-03, flag-04, flag-05, flag-06, flag-neg-01, flag-neg-02, flag-neg-03
 
 <a id="rule-entry-point"></a>
 ### \`entry-point\` (entry_point) — OK
@@ -2045,7 +2045,7 @@ _None._
 
 **Provenance**
 
-- \`skills/entry-point.md\` § declaring-an-entry-point — examples: entry-01, entry-02, entry-03, entry-04, entry-05, entry-06, entry-neg-01, entry-neg-02, entry-neg-03
+- \`entry-point.md\` § declaring-an-entry-point — examples: entry-01, entry-02, entry-03, entry-04, entry-05, entry-06, entry-neg-01, entry-neg-02, entry-neg-03
 
 
 ## Sample-scan warnings
@@ -2061,15 +2061,15 @@ _Synthesis details unavailable (pass \`--synthesis <file>\` to \`lsc report\`)._
 
 ### Skill file hashes
 
-- \`skills/language-basics.md\` — sha256 \`d96e4e99404e5bcea7dfc580dd5ca36aea4c38fe3b09fe4fe973ec77fe55b469\`
-- \`skills/module.md\` — sha256 \`8726ba9efff6553b38536488a6b94ade71cdcec50ed76506de9550e49b04d426\`
-- \`skills/procedure.md\` — sha256 \`55994bb01a2f5dfc6d74d3846a958958ae55de8eebee4175106715047dcf7411\`
-- \`skills/call.md\` — sha256 \`b2e134f5075a6ef524d9d9924da4082b5b31ca3980a807141840dbb1369e91bd\`
-- \`skills/include.md\` — sha256 \`c2ffba25e7c1daf670b60c9a6b2a3474618da0d8467c0b2ec3e8dcdcf7317011\`
-- \`skills/db-read.md\` — sha256 \`51ee4a22f0c1f80c03bac0412ad260cdab4c60ae6e6262a5e03bf88394e65971\`
-- \`skills/db-write.md\` — sha256 \`45a60588788bbce069eb6b24566f5a7828749d7ff4aa16f24f0a8318d4b5a3fe\`
-- \`skills/config-flag.md\` — sha256 \`ea9696b64b82100786b84303cddf86cf1ead527c13d85c9ae8153c7b84ffc6c9\`
-- \`skills/entry-point.md\` — sha256 \`1f3d265af107947941089481aa3fec7d9c115e3857e99ef7dc4b4a9ef588140c\`
+- \`language-basics.md\` — sha256 \`d96e4e99404e5bcea7dfc580dd5ca36aea4c38fe3b09fe4fe973ec77fe55b469\`
+- \`module.md\` — sha256 \`8726ba9efff6553b38536488a6b94ade71cdcec50ed76506de9550e49b04d426\`
+- \`procedure.md\` — sha256 \`55994bb01a2f5dfc6d74d3846a958958ae55de8eebee4175106715047dcf7411\`
+- \`call.md\` — sha256 \`b2e134f5075a6ef524d9d9924da4082b5b31ca3980a807141840dbb1369e91bd\`
+- \`include.md\` — sha256 \`c2ffba25e7c1daf670b60c9a6b2a3474618da0d8467c0b2ec3e8dcdcf7317011\`
+- \`db-read.md\` — sha256 \`51ee4a22f0c1f80c03bac0412ad260cdab4c60ae6e6262a5e03bf88394e65971\`
+- \`db-write.md\` — sha256 \`45a60588788bbce069eb6b24566f5a7828749d7ff4aa16f24f0a8318d4b5a3fe\`
+- \`config-flag.md\` — sha256 \`ea9696b64b82100786b84303cddf86cf1ead527c13d85c9ae8153c7b84ffc6c9\`
+- \`entry-point.md\` — sha256 \`1f3d265af107947941089481aa3fec7d9c115e3857e99ef7dc4b4a9ef588140c\`
 
 
 "

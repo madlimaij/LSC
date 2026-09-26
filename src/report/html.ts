@@ -22,6 +22,16 @@ function esc(text: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * Escapes text, then turns markdown backtick-quoted spans (`` `...` ``) into `<code>` elements.
+ * Some strings shared with the Markdown renderer carry inline code this way (e.g.
+ * `redactReviewProblem`'s "see `lsc review`", src/report/synthesis-view.ts); `esc` alone left the
+ * literal backticks in the HTML output instead of rendering them as code (WP-07 follow-up).
+ */
+function escCode(text: string): string {
+  return esc(text).replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
 function captureText(captures: Readonly<Record<string, string | undefined>>): string {
   const entries = Object.entries(captures).filter((entry): entry is [string, string] => entry[1] !== undefined);
   if (entries.length === 0) return '(none)';
@@ -197,10 +207,29 @@ function renderSynthesisAttempts(attempts: NonNullable<Report['synthesis']>['con
   const items = attempts
     .map(
       (a) =>
-        `<li>attempt ${String(a.attempt)}: <strong>${esc(a.outcome)}</strong>${a.problems.length > 0 ? ` &mdash; ${esc(a.problems.join(' | '))}` : ''}</li>`,
+        `<li>attempt ${String(a.attempt)}: <strong>${esc(a.outcome)}</strong>${a.problems.length > 0 ? ` &mdash; ${escCode(a.problems.join(' | '))}` : ''}</li>`,
     )
     .join('');
   return `<ul>${items}</ul>`;
+}
+
+/**
+ * `modelSource` block, shown at the top of the Synthesis section (D25 item 2, WP-07 follow-up:
+ * "show it prominently ... at the top of the Synthesis section"). Falls back to the "not recorded"
+ * `providerNote` for a `synthesis.json` written before `modelSource` existed.
+ */
+function renderModelSource(synthesis: NonNullable<Report['synthesis']>): string {
+  if (synthesis.modelSource === undefined) {
+    return synthesis.providerNote !== undefined ? `<li class="warn">${esc(synthesis.providerNote)}</li>` : '';
+  }
+  const m = synthesis.modelSource;
+  const notRealModel = m.notRealModel
+    ? `<li class="warn"><strong>These rules were not produced by a real model</strong> &mdash; the answers behind this Rule Set are hand-written (or a mix that includes hand-written answers), not a live or recorded model call.</li>`
+    : '';
+  return (
+    `<li><strong>Model source:</strong> ${esc(m.summary)} (mode <code>${esc(m.mode)}</code>, configured provider <code>${esc(m.configuredProvider)}</code>, ` +
+    `provider <code>${esc(m.provider)}</code>, model <code>${esc(m.model)}</code>, origin <code>${esc(m.origin)}</code>)</li>${notRealModel}`
+  );
 }
 
 function renderSynthesis(report: Report): string {
@@ -218,12 +247,12 @@ function renderSynthesis(report: Report): string {
     .join('');
   return (
     `<ul class="facts">` +
+    renderModelSource(s) +
     `<li>Compile status: <strong>${esc(s.status)}</strong>${s.error !== undefined ? ` &mdash; ${esc(s.error)}` : ''}</li>` +
     `<li>Lexical settings: <strong>${esc(s.lexicalStatus)}</strong>${s.lexicalReason !== undefined ? ` &mdash; ${esc(s.lexicalReason)}` : ''}</li>` +
     `<li>Constructs: ${String(s.summary.constructs)} (validated ${String(s.summary.validated)}, rejected ${String(s.summary.rejected)}, ` +
     `not justified ${String(s.summary.notJustified)}, skipped ${String(s.summary.skipped)}, not attempted ${String(s.summary.notAttempted)})</li>` +
     `<li>Model usage: ${String(s.usage.calls)} call(s), ${String(s.usage.inputTokens)} input + ${String(s.usage.outputTokens)} output tokens</li>` +
-    `<li class="warn">${esc(s.providerNote)}</li>` +
     `</ul><ul>${constructs}</ul>`
   );
 }

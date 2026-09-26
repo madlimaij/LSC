@@ -139,6 +139,22 @@ export interface SynthesisUsageView {
   readonly calls: number;
 }
 
+/**
+ * The report's view of `synthesis.json`'s `modelSource` (src/synth/model-source.ts, D25 item 2):
+ * provider, model and recording origin of the model answers behind this Rule Set. `notRealModel`
+ * is true when `origin` is `hand-written` or `mixed`, i.e. at least the hand-written share of the
+ * rules were not produced by a real model — the report must say so plainly (WP-07 follow-up).
+ */
+export interface SynthesisModelSourceView {
+  readonly mode: string;
+  readonly configuredProvider: string;
+  readonly provider: string;
+  readonly model: string;
+  readonly origin: string;
+  readonly summary: string;
+  readonly notRealModel: boolean;
+}
+
 /** What `synthesis.json` (WP-09, src/synth/synthesis-schema.ts) says about how the draft Rule Set was produced (D25 item 2). Only present with `--synthesis`. */
 export interface SynthesisView {
   readonly status: string;
@@ -148,8 +164,10 @@ export interface SynthesisView {
   readonly constructs: readonly SynthesisConstructView[];
   readonly summary: { readonly constructs: number; readonly validated: number; readonly rejected: number; readonly notJustified: number; readonly skipped: number; readonly notAttempted: number };
   readonly usage: SynthesisUsageView;
-  /** Always present: `synthesis.json` (src/synth/synthesis-schema.ts) has no `provider`/`model`/recording-origin field as of WP-09 (see this package's WP-07 completion note); this says so instead of silently omitting the section. */
-  readonly providerNote: string;
+  /** Present when `synthesis.json` has `modelSource` (every file written after this follow-up); rendered instead of `providerNote`. */
+  readonly modelSource?: SynthesisModelSourceView;
+  /** Present only when `modelSource` is absent (a `synthesis.json` written before it existed): says so instead of silently omitting the section. */
+  readonly providerNote?: string;
 }
 
 /** One Skill file whose hash in the Rule Set's `sourceSkills` no longer matches the file at `--skills-dir` (or is missing there), reviewer Q5 / D25 item 4. */

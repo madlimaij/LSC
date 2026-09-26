@@ -13,7 +13,7 @@
  * `redactReviewProblem` keeps the example id, its polarity/role and the
  * `[review example]` tag, and drops everything after it.
  */
-import type { SynthesisConstructView, SynthesisUsageView, SynthesisView } from './model.js';
+import type { SynthesisConstructView, SynthesisModelSourceView, SynthesisUsageView, SynthesisView } from './model.js';
 import type { SynthesisReport } from '../synth/synthesis-schema.js';
 
 const REVIEW_TAG = '[review example]';
@@ -27,8 +27,25 @@ export function redactReviewProblem(problem: string): string {
 }
 
 const PROVIDER_NOTE =
-  'synthesis.json (src/synth/synthesis-schema.ts) does not record provider, model or recording origin as of WP-09; ' +
-  'only token usage is available (see this package\'s WP-07 completion note).';
+  'synthesis.json (src/synth/synthesis-schema.ts) does not record provider, model or recording origin; ' +
+  'only token usage is available. (This file was written before modelSource was added — see this package\'s WP-07 follow-up completion note.)';
+
+/** Builds the report's view of `synthesis.json`'s `modelSource`, when present (D25 item 2). */
+function buildModelSourceView(synthesis: SynthesisReport): SynthesisModelSourceView | undefined {
+  const m = synthesis.modelSource;
+  if (m === undefined) return undefined;
+  return {
+    mode: m.mode,
+    configuredProvider: m.configuredProvider,
+    provider: m.provider,
+    model: m.model,
+    origin: m.origin,
+    summary: m.summary,
+    // hand-written: every answer was hand-written. mixed: at least some were (D25 item 2 / WP-07 follow-up:
+    // "when the origin is hand-written or mixed, state plainly that the rules were not produced by a real model").
+    notRealModel: m.origin === 'hand-written' || m.origin === 'mixed',
+  };
+}
 
 /** Builds the report's view of one `synthesis.json` (D25 item 2). */
 export function buildSynthesisView(synthesis: SynthesisReport): SynthesisView {
@@ -47,6 +64,7 @@ export function buildSynthesisView(synthesis: SynthesisReport): SynthesisView {
   }));
 
   const usage: SynthesisUsageView = { inputTokens: synthesis.usage.inputTokens, outputTokens: synthesis.usage.outputTokens, calls: synthesis.usage.calls };
+  const modelSource = buildModelSourceView(synthesis);
 
   return {
     status: synthesis.status,
@@ -56,6 +74,8 @@ export function buildSynthesisView(synthesis: SynthesisReport): SynthesisView {
     constructs,
     summary: { ...synthesis.summary },
     usage,
-    providerNote: PROVIDER_NOTE,
+    // modelSource replaces providerNote (WP-07 follow-up, D25 item 2): older synthesis.json files
+    // (no modelSource) still get a clear "not recorded" note instead of the section going silent.
+    ...(modelSource !== undefined ? { modelSource } : { providerNote: PROVIDER_NOTE }),
   };
 }

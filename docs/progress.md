@@ -9,9 +9,9 @@
 | WP-04 | Rule engines | engine-builder | WP-02, WP-03 | done (reviewed wave 2, round 3; last fix verified by orchestrator) |
 | WP-05 | Test runner | engine-builder | WP-04 | done (reviewed wave 2, round 3) |
 | WP-06 | Skill ingestion | skill-ingester | WP-03 | done (reviewed wave 2, round 3) |
-| WP-07 | Report + review CLI | report-builder | WP-05 | round 1 fixes + D25 additions done (awaiting re-review) |
+| WP-07 | Report + review CLI | report-builder | WP-05 | fixes + D25 additions done (awaiting wave 3 re-review) |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
-| WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | compile-writes-report change in progress; real run deferred to G4 (D25) |
+| WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | fix done (awaiting wave 3 re-review); real run deferred to G4 (D25) |
 | WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | not started |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
 | WP-12 | Extra engines (conditional) | engine-builder | WP-11 | not started |
@@ -391,3 +391,41 @@ B. Owner additions (D25 items 2 and 4), extending the report model and both rend
 - The frozen fixture's `sourceSkills` path-prefix inconsistency (deviation 2 above) should probably be corrected by `contract-architect`, or `contract/CONTRACT.md`'s wording should be revisited if "skills/..." was actually the intended convention all along (in which case `ingestSkills`'s bare-name output, which WP-06 and this WP both rely on, would need to change instead).
 - `synthesis.json` has no provider/model/recording-origin field at all (not merely optional-and-sometimes-present). If the owner wants that in the report, `src/synth/synthesis-schema.ts` needs a WP-09/llm-integrator change to add it; `src/report/` already renders it the moment it exists (nothing here would need to change beyond removing the `providerNote`).
 - Carried over from the previous note: should `--format json` ever become a stable contract? Review still has no prompt for editing captures.
+
+### WP-07 follow-up: model source and 1.0.3 paths (`report-builder`, 2026-09-26)
+
+**What was built:**
+
+1. **Contract 1.0.3 path fixture fix (D26 a) verified and snapshot re-recorded.** With the fixture Rule Set's `sourceSkills[].path`/`sourceEvidence[].skill` now bare names (`module.md`, not `skills/module.md`), re-ran `npx vitest run tests/report/markdown.test.ts -u`. Confirmed the diff is *only* the path text (`skills/<file>.md` → `<file>.md`, in both the per-rule Provenance bullets and the global Skill file hashes list) — nothing from item 3 below, because this snapshot test does not pass `--synthesis`.
+2. **`cli-report.test.ts` / `skill-hash-check.test.ts` updated for the corrected fixture.** Removed `ruleSetWithRealSourceSkillPaths()` (and its now-stale comment describing the fixture/`ingestSkills` mismatch) — the fixture Rule Set's own `sourceSkills` now already follow the documented convention, so the two existing hash-check tests build their Rule Set from `loadFixtureRuleSet()` directly. Added a new test, `'lsc report --ruleset <fixture> --skills-dir fixtures/toylang/skills gives no hash-drift warning'`, running the real CLI against the real fixture and the real `--skills-dir`, asserting no `WARNING` on stderr and "every Skill file hash still matches" in the report. `tests/report/skill-hash-check.test.ts`'s `skills/module.md`/`skills/removed.md` literals switched to the documented bare form (`module.md`/`removed.md`).
+3. **`modelSource` rendered in the report (D25 item 2).** `SynthesisModelSourceView` (`model.ts`): mode, configuredProvider, provider, model, origin, summary, and a derived `notRealModel` (true when `origin` is `hand-written` or `mixed`). `synthesis-view.ts`'s `buildSynthesisView` now builds this from `synthesis.modelSource` when present, and falls back to the (reworded) `providerNote` "not recorded" note only when it is absent (older `synthesis.json` files written before WP-09's follow-up added the field) — `providerNote` and `modelSource` are mutually exclusive, both optional on `SynthesisView`. Both renderers show it at the **top of the `## Synthesis`/`<h2>Synthesis</h2>` section** (one of the two prominent placements D25 item 2 allows), before compile status: provider, model, origin and mode, plus — when `notRealModel` is true — an explicit bolded sentence that the rules were not produced by a real model. `src/report/README.md` §"Modules"/"Section order" updated to describe this.
+4. **Fixed literal backticks in the HTML redaction note.** `redactReviewProblem`'s "... see \`lsc review\`" (synthesis-view.ts) is shared with the Markdown renderer, where backticks render as inline code as intended; the HTML renderer's `esc()` does not interpret markdown, so the same text showed literal backtick characters. Added `escCode()` (`html.ts`): escapes HTML special characters, then converts backtick-quoted spans into `<code>...</code>`. Used for `renderSynthesisAttempts`' per-attempt `problems` text (the only place this redacted text reaches the HTML renderer). New test: `cli-report.test.ts` "a redacted review-example problem renders as `<code>`, not literal backticks, in HTML" — feeds a raw `[review example]`-tagged problem through the real CLI and asserts `<code>lsc review</code>` appears, the literal backtick form does not, and the withheld repository-sample capture text (`table="stock_levels"`) still does not appear.
+5. **Orchestrator ruling on llm-integrator's open question 1, recorded.** Added one sentence to `src/report/README.md`'s intro: report files may contain repository-sample text (rule sections legitimately show snippets/captures for unreviewed matches, representative matches and defects — this was already true before this follow-up) and must not leave the machine they were generated on, for a real language. The Synthesis-section redaction (`redactReviewProblem`) is unchanged — D16 g governs what reaches a *model provider*, not a local report file, so no further redaction was added there.
+
+**New/changed files:** `src/report/model.ts`, `synthesis-view.ts`, `markdown.ts`, `html.ts`, `README.md` (changed, no new files). Tests: `tests/report/cli-report.test.ts`, `skill-hash-check.test.ts`, `build.test.ts`, `synthesis-view.test.ts`, `__snapshots__/markdown.test.ts.snap` (changed).
+
+**Acceptance criteria (this follow-up):**
+- Markdown snapshot re-recorded, diff is only the path text (plus task 3, verified absent here): **met** (see item 1 above; `git diff tests/report/__snapshots__/markdown.test.ts.snap`).
+- Stale fixture-mismatch comment/helper removed, tests use the fixture's own `sourceSkills`, new no-drift-warning test added, `skill-hash-check.test.ts` literals switched to bare form: **met** (`cli-report.test.ts`, `skill-hash-check.test.ts`).
+- `modelSource` rendered prominently in both formats, replacing `providerNote` when present, with an explicit "not a real model" statement for hand-written/mixed origin, and a clear "not recorded" note when `modelSource` is absent: **met** (`cli-report.test.ts` "states plainly the rules were not produced by a real model, in both formats"; existing "does not record provider, model or recording origin" assertion still passes unchanged for a `modelSource`-less fixture).
+- HTML redaction note no longer shows literal backticks: **met** (`cli-report.test.ts` "renders as `<code>`, not literal backticks").
+- README sentence on repository-sample text / not leaving the machine added: **met** (`src/report/README.md`, second paragraph of the intro).
+- `npm run typecheck`, `npm run lint`, `npm test`: **met** — 64 files, 625 tests, clean typecheck and lint (this session).
+
+**Deviations:**
+- None from the brief. `SynthesisModelSourceView` re-derives `notRealModel` from `origin` rather than exposing `calls[]` in the report view; the per-origin/provider/model call breakdown is already folded into `modelSource.summary` (built by `buildModelSource`, `src/synth/model-source.ts`) which the report shows verbatim, so `calls[]` itself did not seem worth a second, separate rendering — flagged below in case the owner wants the raw breakdown shown too.
+- `tests/report/build.test.ts` and `tests/report/synthesis-view.test.ts` needed a one-line change each (`providerNote.length` → `providerNote?.length`) purely because `providerNote` became optional on `SynthesisView`; no behavioural change to those tests.
+
+**Open questions:**
+- Should the report also render `modelSource.calls[]` (the per-origin/provider/model call-count breakdown) explicitly, e.g. as a small table, rather than relying on it being folded into the one-line `summary`? Left out for now since `summary` already states the counts in prose for the `mixed` case.
+- Carried over: should `--format json` ever become a stable contract? Review still has no prompt for editing captures.
+
+### WP-09 review fix: compile writes the report (`llm-integrator`, 2026-09-26)
+
+*(Appended by the orchestrator from the agent's final message; committed in 280a17f.)*
+
+- `lsc compile` calls `renderReportFiles` and writes `report.md` and `report.html` into `--out` (`compile-cli.test.ts` › "writes report.md and report.html into --out…", › "the report written by compile shows call as rejected with its reasons…").
+- `synthesis.json` gains a top-level `modelSource` (mode, configuredProvider, provider, model, origin, calls[], summary). It is `"mixed"` with counts when origins differ (`model-source.test.ts`; › "a replay mixing recording origins says 'mixed'…").
+- Privacy: fixed a leak where a failing review example's captures reached the construct `reason` (`privacy.test.ts` › "a failing review example: its captures stay out of prompts, the construct reason and the report synthesis section"). D16 g and D19 d tests still pass.
+- Orchestrator ruling on the open question: review-example code and captures may appear in a report's rule sections. The report is a local file, and D16 g covers the model provider. Report files must not leave the machine for real-language inputs (recorded in `src/report/README.md`).
+- Deviation: `modelSource` is optional in the schema, for older files and the report tests. `src/cli/commands/README.md` (owned by `contract-architect`) may still describe the old printed `lsc report` command.

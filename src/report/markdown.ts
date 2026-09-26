@@ -12,6 +12,7 @@ import type {
   RepresentativeMatchEntry,
   RuleReport,
   SynthesisAttemptView,
+  SynthesisView,
   WrongCaptureEntry,
 } from './model.js';
 
@@ -245,19 +246,39 @@ function renderSynthesisAttempts(attempts: readonly SynthesisAttemptView[]): str
     .join('\n');
 }
 
+/**
+ * `modelSource` line, shown at the top of the Synthesis section (D25 item 2, WP-07 follow-up:
+ * "show it prominently ... at the top of the Synthesis section"). Falls back to the "not recorded"
+ * `providerNote` for a `synthesis.json` written before `modelSource` existed.
+ */
+function renderModelSource(synthesis: SynthesisView): string {
+  if (synthesis.modelSource === undefined) {
+    return synthesis.providerNote !== undefined ? `- ⚠ ${synthesis.providerNote}\n` : '';
+  }
+  const m = synthesis.modelSource;
+  const lines = [
+    `- **Model source:** ${m.summary} (mode \`${m.mode}\`, configured provider \`${m.configuredProvider}\`, provider \`${m.provider}\`, model \`${m.model}\`, origin \`${m.origin}\`)`,
+  ];
+  if (m.notRealModel) {
+    lines.push('- ⚠ **These rules were not produced by a real model** — the answers behind this Rule Set are hand-written (or a mix that includes hand-written answers), not a live or recorded model call.');
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 /** Each construct's synthesis outcome and reasons from `synthesis.json` (D25 item 2), only with `--synthesis`. */
 function renderSynthesis(report: Report): string {
   if (report.synthesis === undefined) {
     return '_Synthesis details unavailable (pass `--synthesis <file>` to `lsc report`)._';
   }
   const s = report.synthesis;
+  const modelSourceLines = renderModelSource(s).trimEnd();
   const lines = [
+    ...(modelSourceLines.length > 0 ? [modelSourceLines] : []),
     `- Compile status: **${s.status}**${s.error !== undefined ? ` — ${s.error}` : ''}`,
     `- Lexical settings: **${s.lexicalStatus}**${s.lexicalReason !== undefined ? ` — ${s.lexicalReason}` : ''}`,
     `- Constructs: ${String(s.summary.constructs)} (validated ${String(s.summary.validated)}, rejected ${String(s.summary.rejected)}, ` +
       `not justified ${String(s.summary.notJustified)}, skipped ${String(s.summary.skipped)}, not attempted ${String(s.summary.notAttempted)})`,
     `- Model usage: ${String(s.usage.calls)} call(s), ${String(s.usage.inputTokens)} input + ${String(s.usage.outputTokens)} output tokens`,
-    `- ⚠ ${s.providerNote}`,
     '',
     ...s.constructs.map(
       (c) =>

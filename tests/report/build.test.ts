@@ -179,7 +179,7 @@ describe('buildReport: D25 owner additions', () => {
     const report = buildReport(results, { synthesis: fakeSynthesis() });
     expect(report.synthesis?.constructs).toHaveLength(1);
     expect(report.synthesis?.constructs[0]).toMatchObject({ constructId: 'db-read', status: 'validated', attemptCount: 1 });
-    expect(report.synthesis?.providerNote.length).toBeGreaterThan(0); // states what's missing, never silent
+    expect(report.synthesis?.providerNote?.length).toBeGreaterThan(0); // states what's missing, never silent (no modelSource on this fixture)
   });
 
   it('without --synthesis, synthesis details are unavailable, not guessed', () => {

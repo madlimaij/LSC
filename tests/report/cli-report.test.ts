@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProgram } from '../../src/cli/index.js';
-import { ingestSkills } from '../../src/ingest/index.js';
 import { runRules } from '../../src/runner/index.js';
 import type { SynthesisReport } from '../../src/synth/index.js';
 import { cloneRuleSet, fixtureExamples, loadFixtureRuleSet, loadSampleFiles, RULESET_PATH, SKILLS_DIR } from './helpers.js';
@@ -138,6 +137,70 @@ describe('lsc report', () => {
     expect(text).toMatch(/does not record provider, model or recording origin/);
   });
 
+  it('--synthesis with a modelSource of hand-written origin states plainly the rules were not produced by a real model, in both formats', async () => {
+    const synthesisFile = join(tmp, 'synthesis.json');
+    writeFileSync(
+      synthesisFile,
+      JSON.stringify({
+        ...fakeSynthesis(),
+        modelSource: {
+          mode: 'replay',
+          configuredProvider: 'fake',
+          provider: 'hand-written',
+          model: 'hand-written',
+          origin: 'hand-written',
+          calls: [{ origin: 'hand-written', provider: 'hand-written', model: 'hand-written', calls: 1 }],
+          summary: 'replay of hand-written recordings (1 call(s); provider hand-written, model hand-written)',
+        },
+      }),
+    );
+
+    expect(await runCli(resultsFile, '--synthesis', synthesisFile)).toBe(0);
+    const md = out.join('');
+    expect(md).toContain('Model source:');
+    expect(md).toMatch(/not produced by a real model/);
+    expect(md).not.toMatch(/does not record provider, model or recording origin/); // modelSource replaces providerNote
+
+    out = [];
+    expect(await runCli(resultsFile, '--synthesis', synthesisFile, '--format', 'html')).toBe(0);
+    const html = out.join('');
+    expect(html).toContain('Model source:');
+    expect(html).toMatch(/not produced by a real model/);
+  });
+
+  it('a redacted review-example problem renders as <code>, not literal backticks, in HTML', async () => {
+    const synthesisFile = join(tmp, 'synthesis.json');
+    writeFileSync(
+      synthesisFile,
+      JSON.stringify({
+        ...fakeSynthesis(),
+        constructs: [
+          {
+            constructId: 'db-read',
+            ruleType: 'db_read',
+            status: 'validated',
+            ruleId: 'db-read',
+            attempts: [
+              {
+                attempt: 1,
+                requestHash: 'a'.repeat(64),
+                outcome: 'failed-tests',
+                problems: ['review-db-read-002 (negative example of db-read) [review example]: unexpected match line 6 table="stock_levels"'],
+                usage: { inputTokens: 1, outputTokens: 1 },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(await runCli(resultsFile, '--synthesis', synthesisFile, '--format', 'html')).toBe(0);
+    const html = out.join('');
+    expect(html).toContain('<code>lsc review</code>');
+    expect(html).not.toMatch(/`lsc review`/); // no literal markdown backticks leak into HTML (WP-07 follow-up)
+    expect(html).not.toMatch(/unexpected match line 6 table=&quot;stock_levels&quot;/); // repository-sample capture text from the redacted problem, specifically, still withheld
+  });
+
   it('an invalid --synthesis file is rejected with a readable error', async () => {
     const synthesisFile = join(tmp, 'synthesis.json');
     writeFileSync(synthesisFile, JSON.stringify({ not: 'a synthesis report' }));
@@ -145,21 +208,15 @@ describe('lsc report', () => {
     expect(err.join('')).toContain('is not a valid synthesis.json');
   });
 
-  // The frozen fixture Rule Set's own `sourceSkills` paths are prefixed "skills/" (contract/fixtures/toylang.ruleset.json),
-  // while `ingestSkills(skillsDir).sourceSkills` — and contract/CONTRACT.md's definition ("relative to the Skill
-  // directory", i.e. --skills-dir itself) — give bare names ("module.md"). That mismatch is a pre-existing
-  // inconsistency in a frozen, contract-architect-owned fixture (see this package's WP-07 completion note, open
-  // question), not something to paper over here: these two tests build a Rule Set whose `sourceSkills` follow the
-  // documented convention instead, so the check is exercised the way `lsc compile`'s own output would be.
-  function ruleSetWithRealSourceSkillPaths() {
-    const ruleSet = cloneRuleSet();
-    ruleSet.sourceSkills = ingestSkills(SKILLS_DIR).sourceSkills;
-    return ruleSet;
-  }
+  // Contract 1.0.3 (D26 a): the fixture Rule Set's own `sourceSkills` paths (contract/fixtures/toylang.ruleset.json)
+  // are now bare names ("module.md"), the same convention `ingestSkills(skillsDir).sourceSkills` and
+  // contract/CONTRACT.md §7 ("relative to the Skill directory", i.e. --skills-dir itself) use. So these tests use
+  // the fixture Rule Set's own `sourceSkills` directly; no rewriting is needed to exercise the check the way `lsc
+  // compile`'s own output would be.
 
   it('--ruleset + --skills-dir warns (stderr and report) when a Skill file hash has drifted from the Rule Set', async () => {
     const rulesetFile = join(tmp, 'toylang.ruleset.json');
-    writeFileSync(rulesetFile, JSON.stringify(ruleSetWithRealSourceSkillPaths()));
+    writeFileSync(rulesetFile, JSON.stringify(loadFixtureRuleSet()));
     const skillsDir = join(tmp, 'toylang-skills');
     cpSync(SKILLS_DIR, skillsDir, { recursive: true });
     writeFileSync(join(skillsDir, 'module.md'), '# edited after the Rule Set was compiled\n');
@@ -172,8 +229,14 @@ describe('lsc report', () => {
 
   it('--ruleset + --skills-dir with unchanged Skill files warns of nothing', async () => {
     const rulesetFile = join(tmp, 'toylang.ruleset.json');
-    writeFileSync(rulesetFile, JSON.stringify(ruleSetWithRealSourceSkillPaths()));
+    writeFileSync(rulesetFile, JSON.stringify(loadFixtureRuleSet()));
     expect(await runCli(resultsFile, '--ruleset', rulesetFile, '--skills-dir', SKILLS_DIR)).toBe(0);
+    expect(err.join('')).not.toContain('WARNING');
+    expect(out.join('')).toContain('every Skill file hash still matches');
+  });
+
+  it('lsc report --ruleset <fixture> --skills-dir fixtures/toylang/skills gives no hash-drift warning (the fixture Rule Set and the Skill directory on disk agree, contract 1.0.3 / D26 a)', async () => {
+    expect(await runCli(resultsFile, '--ruleset', RULESET_PATH, '--skills-dir', SKILLS_DIR)).toBe(0);
     expect(err.join('')).not.toContain('WARNING');
     expect(out.join('')).toContain('every Skill file hash still matches');
   });
