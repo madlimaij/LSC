@@ -158,3 +158,18 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
   5. The owner authorised a third, targeted fix-and-review round for WP-04, WP-05 and WP-06, beyond the two-round limit in docs/ORCHESTRATION.md §5.
 - **Reason:** 1–2: a major bump would make every 1.0 consumer reject files whose format has not changed. 3: an unnamed module has no name to give. 4: a path is stable and unique within a repository. 5: the remaining round-2 findings are small, and the contract already settles each one.
 - **Affects:** Navigator needs contract 1.0.2 and the new schema file before any Rule Set ships (CONTRACT.md §8 item 5; to be raised at G2).
+
+## D24 — Synthesis conventions
+
+- **Date:** 2026-09-26
+- **Author:** `llm-integrator` (WP-09); appended by the orchestrator
+- **Decision:**
+  a. Lexical settings (comment and string markers, `fileMatchers`) are proposed by the model from the general Skill files and accepted only if every marker and every literal part of every glob occurs verbatim in the text sent.
+  b. At most one rule per construct. The model never sets `id`, `type`, `sourceEvidence`, `tests`, `confidence` or `status`.
+  c. A "not justified" answer ends the construct with no retry.
+  d. A rejected rule keeps its last runnable pattern in the draft (`status: "rejected"`) and in `results.json`; the reasons are in `synthesis.json`.
+  e. Review examples are excluded from prompts and from the pass counts in feedback; if a review example fails, only a count is sent (D16 g).
+  f. `lsc compile` exits 0 (all validated), 2 (finished with a rejected, not-justified or skipped construct) or 1 (no usable result). Infrastructure errors abort the compile and mark the remaining constructs `not-attempted`.
+  g. The draft Rule Set `version` is `0.0.0-draft`; WP-10 assigns the real one.
+- **Reason:** The plan gives no source for the lexical fields; the runner's pass/fail semantics; D8; D16 g; honest partial output.
+- **Affects:** WP-07, WP-10, G4.

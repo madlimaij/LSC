@@ -11,7 +11,7 @@
 | WP-06 | Skill ingestion | skill-ingester | WP-03 | done (reviewed wave 2, round 3) |
 | WP-07 | Report + review CLI | report-builder | WP-05 | in progress |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
-| WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | in progress |
+| WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | done except real-provider run (awaiting wave 3 review) |
 | WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | not started |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
 | WP-12 | Extra engines (conditional) | engine-builder | WP-11 | not started |
@@ -286,3 +286,38 @@ Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 - **Finding:** `mapMatches` kept only the latest named module, so a module at the same position as a match overwrote an earlier valid one (CONTRACT.md §4.1 item 4). **Fixed** in `src/engines/mapping.ts`: named modules are collected, sorted by (line, column), and `lastModuleBefore` finds the last one strictly before the match, independent of array order.
 - **Evidence:** `tests/engines/mapping.test.ts` covers the reviewer's reproduction (`module a` (1,1), `module b` (3,5), `call x` (3,5) → source `a`), in array order and with the call placed before `module b`. The same-position test with no earlier module still expects the file path. `npm run typecheck` and `npm run lint` clean; `npm test` 46 files, 480 tests (orchestrator re-ran).
 - **Open (for `contract-architect`, next contract update, non-blocking):** CONTRACT.md §4.1 item 4 and §6.6 say "scope" where "named scope" is meant. The engine already follows the intended meaning.
+
+### WP-09: Rule synthesis and refinement loop (`llm-integrator`, 2026-09-26)
+
+*(Appended by the orchestrator from the agent's final message; parallel wave.)*
+
+**What was built:**
+- `src/synth/`: `schema.ts`, `prompts.ts`, `lexical.ts`, `construct-loop.ts`, `compile.ts` (`compileLanguage`), `synthesis-schema.ts`, `guard.ts` (D19 d), `types.ts`, `index.ts`, `README.md`.
+- `src/cli/commands/compile.ts`: `lsc compile <skills-dir> [--sample] [--provider] [--recordings] [--config] [--out] [--language-id] [--max-attempts]`. It writes the draft Rule Set, `results.json` and `synthesis.json`. Exit codes: 0 all validated; 2 finished with a rejected, not-justified or skipped construct; 1 no usable result.
+- `fixtures/recordings/wp09/` (10) and `wp09-reject/` (13): **all hand-written** (`origin: "hand-written"`), with requests from the real pipeline, scripted answers and estimated token counts.
+- `tests/synth/`: 7 test files and a generator.
+
+**Acceptance criteria**
+- Full toylang compile through FakeProvider gives a valid Rule Set covering every rule type: **met** (`compile-cli.test.ts` › "yields a valid draft Rule Set that covers every rule type…", "passes `lsc validate-ruleset`…").
+- A bad first proposal is fixed by refinement within the cap: **met** (› "bad first proposal: refinement fixes db-read…").
+- A case that never converges ends visibly as `rejected`: **met** (› "ends call as rejected, visibly…"; exit 2, the other constructs validated). Also tested: not justified, lexical refusal, budget exhaustion, unknown recording.
+- Repository-sample content never appears in the snippet log: **met** (› "never sends repository-sample file contents…", `privacy.test.ts`).
+- Manual real-provider run on toylang: **not met**. No API key was available. The hand-written replay shows 8/8 rules validated and 10 calls, but the numbers are not from a real model.
+- D16 g (no review examples in prompts): **met** (`privacy.test.ts` › "review examples are tested… but absent from every request", "refinement feedback withholds failing review examples entirely").
+- D19 d (recording guard): **met** (`guard.test.ts`: `LSC_REAL_INPUTS` set, Skill directory outside the fixture tree, sample outside it, symlink out of the tree).
+- Checks: `eslint src/synth tests/synth src/cli/commands/compile.ts` clean; `vitest run tests/synth tests/llm` 113 passed (orchestrator re-ran). Repo-wide checks will be run once WP-07 lands.
+
+**Deviations:**
+1. Lexical settings (markers, globs) are proposed by the model from the general Skill files and accepted only if they appear verbatim in the text sent.
+2. At most one rule per construct.
+3. A rejected rule appears in the draft (`status: "rejected"`), in `results.rules` and in `synthesis.json`.
+4. `lsc compile` does not render the report; it prints the `lsc report` command to run.
+5. Extra CLI options.
+6. The draft `version` is `0.0.0-draft`, and a "not justified" answer is not retried.
+
+**Open questions:**
+- Optional `status` in `RuleResultSchema` (request to engine-builder).
+- Prose without the inline example blocks, to avoid sending examples twice (request to skill-ingester).
+- G4: lexical settings from config if a language has no general Skill file.
+- A real-provider recording run on toylang to replace the hand-written answers.
+- Proposed DECISIONS entry recorded as D24.
