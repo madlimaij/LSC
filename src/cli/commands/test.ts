@@ -28,7 +28,11 @@ function loadSampleFiles(dir: string): SampleFile[] {
 function printSummary(results: Results, diagnosticCount: number): void {
   process.stdout.write(`Rule Set ${results.languageId} ${results.ruleSetVersion}\n`);
   for (const rule of results.rules) {
-    const ruleOk = rule.tests.failed === 0 && rule.missingExampleIds.length === 0 && rule.computedConfidence !== undefined;
+    const ruleOk =
+      rule.tests.failed === 0 &&
+      rule.crossNegativeFailures.length === 0 &&
+      rule.missingExampleIds.length === 0 &&
+      rule.computedConfidence !== undefined;
     const status = ruleOk ? 'PASS' : 'FAIL';
     const computed = rule.computedConfidence ?? 'none (passes no positive example: rejected)';
     process.stdout.write(
@@ -39,6 +43,8 @@ function printSummary(results: Results, diagnosticCount: number): void {
     );
     for (const id of rule.tests.failingExampleIds) process.stdout.write(`      failing example: ${id}\n`);
     for (const id of rule.missingExampleIds) process.stdout.write(`      missing example (cited in sourceEvidence but not found): ${id}\n`);
+    // D19 a: matches on other constructs' negative examples are reported separately from tests.passed/failed.
+    for (const id of rule.crossNegativeFailures) process.stdout.write(`      cross-construct negative matched: ${id}\n`);
   }
   if (results.coverage.ruleTypesMissing.length > 0) {
     process.stdout.write(`No validated rule for: ${results.coverage.ruleTypesMissing.join(', ')}\n`);

@@ -7,7 +7,8 @@
  * this contract (contract/CONTRACT.md and src/contract/ do not export it).
  * `NavigatorAnalysis` below has the shape CONTRACT.md §4 describes; see the
  * WP-04 completion note for the mapping choices this makes where the
- * contract leaves the answer open (§9 Q2, Q3).
+ * contract leaves the answer open (§9 Q2), and contract/CONTRACT.md §4.1
+ * (normative "Mapping rules", added by D20) for the rest, implemented here.
  */
 import { RULE_TYPE_SPEC, type CaptureRole, type Rule, type RuleType } from '../contract/index.js';
 import type { Match } from './types.js';
@@ -60,17 +61,20 @@ export interface EntryPointRecord {
 
 /**
  * Why a match also (or only) produced an `uncertainties` record
- * (contract/CONTRACT.md §4):
+ * (contract/CONTRACT.md §4.1):
  * - `low-confidence`: the rule's confidence is `low`; the primary record is
- *   still produced alongside this one.
+ *   still produced alongside this one (§4.1 item 1).
  * - `ambiguous-capture`: a required capture role's group did not take part
- *   in the match (§9 Q3's proposal: no primary record, an uncertainty instead).
- * - `missing-source-symbol`: the match needs a source symbol (relations,
- *   dbAccesses, configRefs; §4) but no definition scope was open at its
- *   position — same treatment as `ambiguous-capture`. The contract does not
- *   name this case explicitly; see the completion note.
+ *   in the match, or captured the empty string (§4.1 item 2, §6.5) — no
+ *   primary record. For `module_declaration`/`symbol_definition` this is an
+ *   unnamed definition (D19 c): it also opens no scope (`src/engines/blocks.ts`).
+ *
+ * D19 b / D20 removed the earlier `missing-source-symbol` reason: a
+ * relation, db-access or config-ref match with no enclosing symbol now
+ * always gets a fallback source (§4.1 item 4) and produces a normal record,
+ * never an uncertainty for lack of a source.
  */
-export type UncertaintyReason = 'low-confidence' | 'ambiguous-capture' | 'missing-source-symbol';
+export type UncertaintyReason = 'low-confidence' | 'ambiguous-capture';
 
 export interface UncertaintyRecord {
   readonly ruleId: string;
@@ -108,18 +112,38 @@ function emptyAnalysis(): NavigatorAnalysis {
   return { symbols: [], relations: [], dbAccesses: [], configRefs: [], entryPoints: [], uncertainties: [] };
 }
 
-/** Maps every match to its Navigator record(s), using `rules` for confidence and type spec. */
-export function mapMatches(matches: readonly Match[], rules: readonly Rule[]): NavigatorAnalysis {
+/**
+ * A required capture role's value is missing when its group did not take
+ * part in the match (`undefined`) or captured the empty string
+ * (contract/CONTRACT.md §6.5, §4.1 item 2).
+ */
+function isBlank(value: string | undefined): boolean {
+  return value === undefined || value === '';
+}
+
+/**
+ * Maps every match to its Navigator record(s), using `rules` for confidence
+ * and type spec.
+ *
+ * `matches` must be one file's matches in file order (as `scanFile`
+ * returns them). `file` is that file's repository-relative path with `/`
+ * separators (the same string `fileMatchers`, §6.1, matches against) — the
+ * fallback source (§4.1 item 4) when a relation/dbAccess/configRef match has
+ * no enclosing symbol and no preceding named `module_declaration` match.
+ */
+export function mapMatches(matches: readonly Match[], rules: readonly Rule[], file: string): NavigatorAnalysis {
   const ruleById = new Map(rules.map((rule) => [rule.id, rule] as const));
   const out = emptyAnalysis();
+  // Last *named* module_declaration match seen so far, in file order (§4.1 item 4, §6.6):
+  // used regardless of that rule's blockEnd or whether its scope is still open.
+  let lastModuleName: string | undefined;
 
   for (const match of matches) {
     const rule = ruleById.get(match.ruleId);
     if (rule === undefined) continue; // defensive: a match for a rule not in this scan's rule list
 
     const spec = RULE_TYPE_SPEC[match.type];
-    const missingRequired = spec.requiredRoles.some((role) => match.captures[role] === undefined);
-    const missingSource = RECORDS_NEEDING_SOURCE.has(spec.navigatorRecord) && match.enclosingSymbol === undefined;
+    const missingRequired = spec.requiredRoles.some((role) => isBlank(match.captures[role]));
 
     if (rule.confidence === 'low') {
       out.uncertainties.push({
@@ -141,18 +165,11 @@ export function mapMatches(matches: readonly Match[], rules: readonly Rule[]): N
       });
       continue;
     }
-    if (missingSource) {
-      out.uncertainties.push({
-        ruleId: match.ruleId,
-        type: match.type,
-        line: match.line,
-        reason: 'missing-source-symbol',
-        captures: match.captures,
-      });
-      continue;
-    }
 
-    pushRecord(out, match);
+    if (match.type === 'module_declaration') lastModuleName = match.captures.name;
+
+    const source = RECORDS_NEEDING_SOURCE.has(spec.navigatorRecord) ? (match.enclosingSymbol ?? lastModuleName ?? file) : undefined;
+    pushRecord(out, match, source);
   }
 
   return out;
@@ -160,7 +177,7 @@ export function mapMatches(matches: readonly Match[], rules: readonly Rule[]): N
 
 /**
  * Reads a value the caller has already checked is present (a required
- * capture role, or the enclosing symbol for a record that needs a source).
+ * capture role, or the resolved source for a record that needs one).
  * Throws rather than silently mapping `undefined` in if that check is ever
  * wrong; callers only reach here once `pushRecord`'s precondition holds.
  */
@@ -169,8 +186,14 @@ function required(value: string | undefined, what: string): string {
   return value;
 }
 
-function pushRecord(out: NavigatorAnalysis, match: Match): void {
-  const { ruleId, line, captures, enclosingSymbol } = match;
+/**
+ * `source` is the resolved source (§4.1 item 4: enclosing symbol, fallback
+ * module name, or the file itself) for `call`, `include`, `db_read`,
+ * `db_write` and `config_ref` matches; `undefined` for every other type,
+ * which does not use it.
+ */
+function pushRecord(out: NavigatorAnalysis, match: Match, source: string | undefined): void {
+  const { ruleId, line, captures } = match;
   switch (match.type) {
     case 'module_declaration':
       out.symbols.push({ kind: 'module', name: required(captures.name, 'name'), line, ruleId });
@@ -186,7 +209,7 @@ function pushRecord(out: NavigatorAnalysis, match: Match): void {
     case 'call':
       out.relations.push({
         kind: 'calls',
-        source: required(enclosingSymbol, 'enclosingSymbol'),
+        source: required(source, 'source'),
         callee: required(captures.callee, 'callee'),
         ...(captures.module !== undefined ? { module: captures.module } : {}),
         line,
@@ -196,7 +219,7 @@ function pushRecord(out: NavigatorAnalysis, match: Match): void {
     case 'include':
       out.relations.push({
         kind: 'includes',
-        source: required(enclosingSymbol, 'enclosingSymbol'),
+        source: required(source, 'source'),
         target: required(captures.target, 'target'),
         line,
         ruleId,
@@ -205,7 +228,7 @@ function pushRecord(out: NavigatorAnalysis, match: Match): void {
     case 'db_read':
       out.dbAccesses.push({
         mode: 'read',
-        source: required(enclosingSymbol, 'enclosingSymbol'),
+        source: required(source, 'source'),
         table: required(captures.table, 'table'),
         line,
         ruleId,
@@ -214,7 +237,7 @@ function pushRecord(out: NavigatorAnalysis, match: Match): void {
     case 'db_write':
       out.dbAccesses.push({
         mode: 'write',
-        source: required(enclosingSymbol, 'enclosingSymbol'),
+        source: required(source, 'source'),
         table: required(captures.table, 'table'),
         line,
         ruleId,
@@ -222,7 +245,7 @@ function pushRecord(out: NavigatorAnalysis, match: Match): void {
       return;
     case 'config_ref':
       out.configRefs.push({
-        source: required(enclosingSymbol, 'enclosingSymbol'),
+        source: required(source, 'source'),
         key: required(captures.key, 'key'),
         line,
         ruleId,

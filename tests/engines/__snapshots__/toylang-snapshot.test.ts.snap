@@ -43,6 +43,13 @@ exports[`one full toylang file: scan + mapping (WP-04 acceptance criteria) > mat
     ],
     "relations": [
       {
+        "kind": "includes",
+        "line": 2,
+        "ruleId": "include-directive",
+        "source": "billing",
+        "target": "common.tl",
+      },
+      {
         "callee": "apply",
         "kind": "calls",
         "line": 11,
@@ -73,17 +80,7 @@ exports[`one full toylang file: scan + mapping (WP-04 acceptance criteria) > mat
         "ruleId": "proc-definition",
       },
     ],
-    "uncertainties": [
-      {
-        "captures": {
-          "target": "common.tl",
-        },
-        "line": 2,
-        "reason": "missing-source-symbol",
-        "ruleId": "include-directive",
-        "type": "include",
-      },
-    ],
+    "uncertainties": [],
   },
   "matches": [
     {

@@ -44,8 +44,24 @@ describe('toylang fixture Rule Set against all toylang examples', () => {
     for (const rule of results.rules) {
       expect(rule.tests.failed, `rule "${rule.ruleId}" has failing examples: ${rule.tests.failingExampleIds.join(', ')}`).toBe(0);
       expect(rule.missingExampleIds).toEqual([]);
+      expect(rule.crossNegativeFailures).toEqual([]);
     }
     expect(results.ok).toBe(true);
+  });
+
+  it("D19 a: tests.passed per rule counts only the rule's own examples, matching the fixture Rule Set's static tests.passed (SPEC.md §8)", () => {
+    const ruleSet = loadFixtureRuleSet();
+    const ingested = ingestSkills(SKILLS_DIR);
+    const examples = ingested.constructs.flatMap((construct) => construct.examples);
+    const results = runRules(ruleSet, examples, []);
+
+    const staticTestsById = new Map(ruleSet.rules.map((rule) => [rule.id, rule.tests] as const));
+    for (const rule of results.rules) {
+      const fixtureTests = staticTestsById.get(rule.ruleId);
+      expect(fixtureTests, `rule "${rule.ruleId}" missing from the fixture Rule Set`).toBeDefined();
+      expect(rule.tests.passed, `rule "${rule.ruleId}"`).toBe(fixtureTests?.passed);
+      expect(rule.tests.failed, `rule "${rule.ruleId}"`).toBe(fixtureTests?.failed);
+    }
   });
 
   it('every rule reaches high computed confidence on the full example set', () => {

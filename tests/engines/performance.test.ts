@@ -50,7 +50,7 @@ describe('performance guard (WP-04: 50,000-line file under a time budget)', () =
     const start = performance.now();
     const file = prepareFile(ruleSet, text);
     const { matches, warnings } = scanFile(validatedRules, file);
-    const analysis = mapMatches(matches, validatedRules);
+    const analysis = mapMatches(matches, validatedRules, 'perf_test.tl');
     const elapsedMs = performance.now() - start;
 
     // Measured on the development machine: ~1.3s. Budget kept generous (5s) to stay

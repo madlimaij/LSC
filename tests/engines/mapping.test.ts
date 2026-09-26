@@ -113,7 +113,7 @@ describe('Match → Navigator mapping (contract/CONTRACT.md §4)', () => {
       match({ ruleId: 'entry-point', type: 'entry_point', captures: { name: 'run_billing' } }),
     ];
 
-    const analysis = mapMatches(matches, rules);
+    const analysis = mapMatches(matches, rules, 'billing.tl');
     expect(analysis.symbols).toEqual([
       { kind: 'module', name: 'billing', line: 1, ruleId: 'module-declaration' },
       { kind: 'function', name: 'calc_total', line: 1, ruleId: 'proc-definition' },
@@ -149,6 +149,7 @@ describe('Match → Navigator mapping (contract/CONTRACT.md §4)', () => {
         match({ ruleId: 'proc-definition', type: 'symbol_definition', captures: { name: 'b', kind: 'PROC' } }),
       ],
       rules,
+      'f.tl',
     );
     expect(analysis.symbols.map((s) => s.kind)).toEqual(['procedure', 'procedure']);
   });
@@ -157,6 +158,7 @@ describe('Match → Navigator mapping (contract/CONTRACT.md §4)', () => {
     const analysis = mapMatches(
       [match({ captures: { callee: 'x' }, enclosingSymbol: 's' })],
       [callRule('low')],
+      'f.tl',
     );
     expect(analysis.relations).toHaveLength(1);
     expect(analysis.uncertainties).toEqual([
@@ -165,23 +167,64 @@ describe('Match → Navigator mapping (contract/CONTRACT.md §4)', () => {
   });
 
   it('a missing required capture role produces only an uncertainty, no primary record', () => {
-    const analysis = mapMatches([match({ captures: {}, enclosingSymbol: 's' })], [callRule()]);
+    const analysis = mapMatches([match({ captures: {}, enclosingSymbol: 's' })], [callRule()], 'f.tl');
     expect(analysis.relations).toEqual([]);
     expect(analysis.uncertainties).toEqual([
       { ruleId: 'call-statement', type: 'call', line: 1, reason: 'ambiguous-capture', captures: {} },
     ]);
   });
 
-  it('a relation/dbAccess/configRef match with no enclosing symbol produces only an uncertainty', () => {
-    const analysis = mapMatches([match({ captures: { callee: 'x' } })], [callRule()]);
+  it('an empty required capture role is treated as missing, same as absent (D19 c, contract §6.5)', () => {
+    const analysis = mapMatches([match({ captures: { callee: '' }, enclosingSymbol: 's' })], [callRule()], 'f.tl');
     expect(analysis.relations).toEqual([]);
     expect(analysis.uncertainties).toEqual([
-      { ruleId: 'call-statement', type: 'call', line: 1, reason: 'missing-source-symbol', captures: { callee: 'x' } },
+      { ruleId: 'call-statement', type: 'call', line: 1, reason: 'ambiguous-capture', captures: { callee: '' } },
     ]);
   });
 
+  it('a relation/dbAccess/configRef match with no enclosing scope falls back to the last named module_declaration match, or the file itself (D19 b, §4.1 item 4)', () => {
+    const moduleRule: Rule = {
+      id: 'module-declaration',
+      type: 'module_declaration',
+      engine: 'exact',
+      exact: { tokens: ['MODULE', '(?<name>)'], caseSensitive: false },
+      captures: { name: 'name' },
+      confidence: 'high',
+      ...identity,
+    };
+
+    const withModule = mapMatches(
+      [
+        match({ ruleId: 'module-declaration', type: 'module_declaration', captures: { name: 'billing' } }),
+        match({ captures: { callee: 'x' } }),
+      ],
+      [moduleRule, callRule()],
+      'billing.tl',
+    );
+    expect(withModule.relations).toEqual([{ kind: 'calls', source: 'billing', callee: 'x', line: 1, ruleId: 'call-statement' }]);
+    expect(withModule.uncertainties).toEqual([]);
+
+    const withoutModule = mapMatches([match({ captures: { callee: 'x' } })], [callRule()], 'orphan/file.tl');
+    expect(withoutModule.relations).toEqual([
+      { kind: 'calls', source: 'orphan/file.tl', callee: 'x', line: 1, ruleId: 'call-statement' },
+    ]);
+    expect(withoutModule.uncertainties).toEqual([]);
+
+    // An unnamed module_declaration (empty name) does not count as the fallback source (§4.1 item 2/4).
+    const unnamedModule = mapMatches(
+      [
+        match({ ruleId: 'module-declaration', type: 'module_declaration', captures: { name: '' } }),
+        match({ captures: { callee: 'x' } }),
+      ],
+      [moduleRule, callRule()],
+      'orphan2.tl',
+    );
+    const callRelation = unnamedModule.relations.find((r) => r.kind === 'calls');
+    expect(callRelation).toMatchObject({ source: 'orphan2.tl' });
+  });
+
   it('a match for a rule not passed in is skipped defensively', () => {
-    const analysis = mapMatches([match()], []);
+    const analysis = mapMatches([match()], [], 'f.tl');
     expect(analysis.relations).toEqual([]);
     expect(analysis.uncertainties).toEqual([]);
   });

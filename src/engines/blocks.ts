@@ -2,6 +2,17 @@
  * Block tracking (D4, contract/CONTRACT.md §6.6): definition rules with
  * `blockEnd` open and close scopes; every match gets `enclosingSymbol` =
  * innermost still-open scope (any rule) at its start position.
+ *
+ * D19 c / D20 (contract/CONTRACT.md §6.6): an **unnamed** definition (its
+ * `name` capture missing or empty) opens no scope, even when its rule has
+ * `blockEnd` — matches after it keep whatever scope was innermost before it.
+ * Its `blockEnd` match, if any, is still processed like any other `blockEnd`
+ * of that rule (closes the most recently opened, still-open scope of the
+ * same rule; ignored with a warning if none is open) — so with nested
+ * same-rule definitions, an unnamed inner definition's end can close the
+ * outer scope early. This is the contract's adopted behaviour (§9 Q9 b), not
+ * a bug: the alternative (a transparent anonymous scope) would contradict
+ * "opens no scope".
  */
 import type { Rule } from '../contract/index.js';
 import { matchBlockEnd, matchRule } from './match-rule.js';
@@ -87,11 +98,16 @@ export function scanFile(rules: readonly Rule[], file: PreparedFile): ScanResult
     matches.push(innermost?.name !== undefined ? { ...match, enclosingSymbol: innermost.name } : match);
 
     if (rule.blockEnd !== undefined && (rule.type === 'module_declaration' || rule.type === 'symbol_definition')) {
-      const scope: Scope = { ruleId: rule.id, name: match.captures.name, line: match.line, column: match.column };
+      const rawName = match.captures.name;
+      // A missing or empty `name` capture (contract/CONTRACT.md §6.5) is an unnamed definition (D19 c):
+      // its scope is tracked for blockEnd pairing (perRuleStack) but never exposed as an enclosing
+      // symbol (openScopes), and matches after it keep the previously innermost scope.
+      const name = rawName !== undefined && rawName !== '' ? rawName : undefined;
+      const scope: Scope = { ruleId: rule.id, name, line: match.line, column: match.column };
       const stack = perRuleStack.get(rule.id);
       if (stack === undefined) perRuleStack.set(rule.id, [scope]);
       else stack.push(scope);
-      openScopes.push(scope);
+      if (name !== undefined) openScopes.push(scope);
     }
   }
 

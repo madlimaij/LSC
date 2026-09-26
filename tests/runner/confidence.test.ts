@@ -62,4 +62,54 @@ describe('computeConfidence (docs/PLAN.md §6.3, D8)', () => {
       computeConfidence({ positiveTotal: 0, positivePassed: 0, negativeTotal: 0, negativeFailed: 0 }),
     ).toBeUndefined();
   });
+
+  describe('D19 a: cross-construct negatives never raise the "own" threshold, and any cross-construct match blocks high/medium', () => {
+    it("reviewer's case 1: 5 own positives + 0 own negatives + 21 cross-construct negatives (all passing) is not high — 0 own negatives already fails the ≥2 threshold", () => {
+      expect(
+        computeConfidence({ positiveTotal: 5, positivePassed: 5, negativeTotal: 0, negativeFailed: 0, crossNegativeFailed: 0 }),
+      ).not.toBe('high');
+    });
+
+    it("reviewer's case 2: 3 own positives (2 passing) + 2 own negatives stays low regardless of cross-construct negatives", () => {
+      const withoutCross = computeConfidence({ positiveTotal: 3, positivePassed: 2, negativeTotal: 2, negativeFailed: 0 });
+      const withCross = computeConfidence({
+        positiveTotal: 3,
+        positivePassed: 2,
+        negativeTotal: 2,
+        negativeFailed: 0,
+        crossNegativeFailed: 21,
+      });
+      expect(withoutCross).toBe('low');
+      expect(withCross).toBe('low');
+    });
+
+    it('a rule whose own examples alone would be "high" is forced to "low" by a single cross-construct negative match', () => {
+      const withoutCross = computeConfidence({ positiveTotal: 5, positivePassed: 5, negativeTotal: 2, negativeFailed: 0 });
+      const withCross = computeConfidence({
+        positiveTotal: 5,
+        positivePassed: 5,
+        negativeTotal: 2,
+        negativeFailed: 0,
+        crossNegativeFailed: 1,
+      });
+      expect(withoutCross).toBe('high');
+      expect(withCross).toBe('low');
+    });
+
+    it('cross-construct negatives are never counted in the pass rate or the ≥2-negatives threshold', () => {
+      // 0 own negatives: would need negativeTotal >= 2 for high regardless of how many cross-construct
+      // negatives pass; adding 100 passing cross-construct negatives must not change the result.
+      expect(
+        computeConfidence({ positiveTotal: 5, positivePassed: 5, negativeTotal: 0, negativeFailed: 0 }),
+      ).toBe(
+        computeConfidence({
+          positiveTotal: 5,
+          positivePassed: 5,
+          negativeTotal: 0,
+          negativeFailed: 0,
+          crossNegativeFailed: 0,
+        }),
+      );
+    });
+  });
 });

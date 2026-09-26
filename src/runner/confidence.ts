@@ -10,6 +10,13 @@
  * - (rejected is not computed here: "passes no positive example" is
  *   `undefined` below; "exceeds the refinement budget while failing" is a
  *   synthesis-loop concern, not a property of one test run.)
+ *
+ * D19a (owner decision, 2026-09-26): the "≥2 negatives" threshold and the
+ * pass rate use only the construct's own examples (`negativeTotal`/
+ * `negativeFailed` below), never cross-construct negatives. But a rule that
+ * matched *any* cross-construct negative example still cannot be `high` or
+ * `medium` — it matched text it must not match — so `crossNegativeFailed`
+ * forces `low` when positive.
  */
 import type { Confidence } from '../contract/index.js';
 
@@ -18,10 +25,18 @@ export interface ConfidenceInput {
   readonly positiveTotal: number;
   /** How many of those positive examples passed (plan §6.2). */
   readonly positivePassed: number;
-  /** Number of negative examples tested (the rule's own construct plus every other construct's negatives). */
+  /** Number of the rule's own negative examples tested (D19a: own construct only, not cross-construct negatives). */
   readonly negativeTotal: number;
-  /** How many of those negative examples failed (the rule produced a match). */
+  /** How many of the rule's own negative examples failed (the rule produced a match). */
   readonly negativeFailed: number;
+  /**
+   * How many negative examples of *other* constructs ("cross-construct
+   * negatives", plan §8 step 4) this rule matched. Never counted in
+   * `negativeTotal`/`negativeFailed` or the pass rate (D19a), but any value
+   * above 0 blocks `high`/`medium` regardless of the rule's own statistics.
+   * Defaults to 0.
+   */
+  readonly crossNegativeFailed?: number;
 }
 
 /**
@@ -29,7 +44,7 @@ export interface ConfidenceInput {
  * confidence level; a candidate for `status: "rejected"` (docs/PLAN.md §6.3).
  */
 export function computeConfidence(input: ConfidenceInput): Confidence | undefined {
-  const { positiveTotal, positivePassed, negativeTotal, negativeFailed } = input;
+  const { positiveTotal, positivePassed, negativeTotal, negativeFailed, crossNegativeFailed = 0 } = input;
   if (positivePassed <= 0) return undefined;
 
   const allPositivesPass = positivePassed === positiveTotal;
@@ -38,6 +53,7 @@ export function computeConfidence(input: ConfidenceInput): Confidence | undefine
   const totalPassed = positivePassed + (negativeTotal - negativeFailed);
   const passRate = totalExamples === 0 ? 0 : totalPassed / totalExamples;
 
+  if (crossNegativeFailed > 0) return 'low';
   if (positiveTotal >= 5 && negativeTotal >= 2 && allPositivesPass && allNegativesPass) return 'high';
   if (positiveTotal >= 3 && passRate >= 0.9 && allNegativesPass) return 'medium';
   return 'low';

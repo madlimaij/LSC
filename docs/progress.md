@@ -6,9 +6,9 @@
 | WP-01 | Skeleton and tooling | contract-architect | — | done (reviewed wave 1) |
 | WP-02 | Rule Set contract | contract-architect | WP-01 | done (reviewed wave 1) |
 | WP-03 | Example format + toylang | contract-architect | WP-02 | done (reviewed wave 1) |
-| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | round 1 fixed; owner-decision changes (D19) in progress |
-| WP-05 | Test runner | engine-builder | WP-04 | round 1 fixed; owner-decision changes (D19) in progress |
-| WP-06 | Skill ingestion | skill-ingester | WP-03 | round 1 fixed; awaiting re-review |
+| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | D19 changes done; awaiting re-review (round 2) |
+| WP-05 | Test runner | engine-builder | WP-04 | D19 changes done; awaiting re-review (round 2) |
+| WP-06 | Skill ingestion | skill-ingester | WP-03 | round 1 fixed; awaiting re-review (round 2) |
 | WP-07 | Report + review CLI | report-builder | WP-05 | not started |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | not started |
@@ -245,3 +245,19 @@ Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 - WP-06 #3 hash test — **fixed** (multi-file test; test against `sourceSkills` hashes in the fixture Rule Set).
 - WP-06 #4 prose cap — **fixed** (`ingest.test.ts` proseCharLimit tests; `ingest-cli.test.ts` "--prose-limit caps every construct's prose length…").
 - Checks: `npm run typecheck`, `npm run lint` clean; `npm test` 45 files, 459 tests passed.
+
+### WP-04/WP-05 D19 changes (`engine-builder`, 2026-09-26)
+
+*(Appended by the orchestrator from the agent's final message.)*
+
+**What was built:** `src/runner/{confidence,rule-run,results-schema,index}.ts`, `src/cli/commands/test.ts` (D19 a: `tests`, pass rate and ≥2-negatives threshold use own examples only; new `crossNegativeFailures` per rule; any cross-construct negative match fails the rule and forces `low`). `src/engines/blocks.ts` (D19 c: unnamed definitions open no visible scope). `src/engines/mapping.ts` (D19 b / CONTRACT.md §4.1: new `file` parameter; fallback source innermost scope → last named `module_declaration` → file path; missing or empty required capture → uncertainty for every rule type; `missing-source-symbol` removed). READMEs and tests in `tests/engines/` and `tests/runner/` updated; snapshot re-recorded (module-level INCLUDE in `billing.tl` is now an `includes` relation with source `billing`).
+
+**Acceptance criteria**
+- D19 a — **met** (`tests/runner/confidence.test.ts`, `tests/runner/rule-run.test.ts`: reviewer's two cases, cross-negative fails the rule; `toylang-acceptance.test.ts`: `tests` per rule equal the fixture's static `tests`).
+- D19 b — **met** (`tests/engines/mapping.test.ts`, snapshot).
+- D19 c — **met for scope visibility** (`tests/engines/blocks.test.ts`, reviewer's `PROC outer / PROC / CALL x` → `outer`).
+- typecheck, lint, test — **met** (orchestrator re-ran: 45 files, 471 tests).
+
+**Deviations:** The unnamed definition is still pushed on its rule's `blockEnd` stack, so its own `blockEnd` closes itself, not the outer scope. **This differs from CONTRACT.md §6.6/§9 Q9 b** (1.0.1), which says an unnamed definition's `blockEnd` closes the most recent open scope of the same rule (ending an outer same-rule scope early) and explicitly did not adopt the "anonymous scope" alternative. Raised with the project owner.
+
+**Open questions:** §9 Q2 and Q9 a remain for G4.

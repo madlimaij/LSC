@@ -3,6 +3,13 @@
  * examples (from `sourceEvidence[].exampleIds`) plus, per docs/PLAN.md §8
  * step 4 and the WP-05 acceptance criteria, every negative example of every
  * other construct ("cross-construct negatives").
+ *
+ * D19a (owner decision, 2026-09-26): `tests.passed`/`tests.failed` (and the
+ * confidence formula's pass rate and "≥2 negatives" threshold) count only
+ * the rule's own examples — exactly what `coverage.ts` already counts. A
+ * match on a cross-construct negative still fails the rule (reported
+ * separately in `crossNegativeFailures`, blocks `high`/`medium` confidence,
+ * and is not `ok` — see `index.ts`'s `ok` computation).
  */
 import type { Rule } from '../contract/index.js';
 import { matchRule } from '../engines/match-rule.js';
@@ -53,19 +60,11 @@ export function runRuleAgainstExamples(
   }
 
   const exampleResults: RuleResultWithoutSamples['examples'] = [];
-  let passed = 0;
-  let failed = 0;
-  const failingExampleIds: string[] = [];
 
   for (const { example, role } of toTest) {
     const prepared = prepareFile(maskingConfig, example.code);
     const actual = matchRule(rule, prepared);
     const diff = diffExample(example.expected, actual);
-    if (diff.passed) passed += 1;
-    else {
-      failed += 1;
-      failingExampleIds.push(example.id);
-    }
     exampleResults.push({
       exampleId: example.id,
       construct: example.construct,
@@ -78,13 +77,25 @@ export function runRuleAgainstExamples(
     });
   }
 
-  const positive = exampleResults.filter((result) => result.polarity === 'positive');
-  const negative = exampleResults.filter((result) => result.polarity === 'negative');
+  // D19a: tests.passed/failed count only the rule's own examples.
+  const ownResults = exampleResults.filter((result) => result.role === 'own');
+  const passed = ownResults.filter((result) => result.passed).length;
+  const failed = ownResults.length - passed;
+  const failingExampleIds = ownResults.filter((result) => !result.passed).map((result) => result.exampleId);
+
+  // Cross-construct negative failures are reported separately (D19a) and never counted in tests.passed/failed.
+  const crossNegativeFailures = exampleResults
+    .filter((result) => result.role === 'cross-negative' && !result.passed)
+    .map((result) => result.exampleId);
+
+  const positive = ownResults.filter((result) => result.polarity === 'positive');
+  const negative = ownResults.filter((result) => result.polarity === 'negative');
   const computedConfidence = computeConfidence({
     positiveTotal: positive.length,
     positivePassed: positive.filter((result) => result.passed).length,
     negativeTotal: negative.length,
     negativeFailed: negative.filter((result) => !result.passed).length,
+    crossNegativeFailed: crossNegativeFailures.length,
   });
 
   return {
@@ -94,6 +105,7 @@ export function runRuleAgainstExamples(
     missingExampleIds,
     examples: exampleResults,
     tests: { passed, failed, failingExampleIds },
+    crossNegativeFailures,
     declaredConfidence: rule.confidence,
     ...(computedConfidence !== undefined ? { computedConfidence } : {}),
     confidenceMatchesDeclared: computedConfidence === rule.confidence,

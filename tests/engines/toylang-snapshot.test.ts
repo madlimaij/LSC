@@ -23,12 +23,12 @@ describe('one full toylang file: scan + mapping (WP-04 acceptance criteria)', ()
 
     const file = prepareFile(ruleSet, rawText);
     const { matches, warnings } = scanFile(validatedRules, file);
-    const analysis = mapMatches(matches, validatedRules);
+    const analysis = mapMatches(matches, validatedRules, 'billing.tl');
 
     expect({ matches, warnings, analysis }).toMatchSnapshot();
   });
 
-  it('resolves every call, read, write and config-ref inside the procedure to its enclosing procedure; a module-level include has no enclosing symbol', () => {
+  it('resolves every call, read, write and config-ref inside the procedure to its enclosing procedure; a module-level include falls back to the module name (D19 b, §4.1 item 4)', () => {
     const ruleSet = loadToylangRuleSet();
     const validatedRules = ruleSet.rules.filter((r) => r.status === 'validated');
     const rawText = readFileSync(join(here, 'fixtures/billing.tl'), 'utf8');
@@ -39,6 +39,11 @@ describe('one full toylang file: scan + mapping (WP-04 acceptance criteria)', ()
     for (const match of includeMatches) {
       expect(match.enclosingSymbol).toBeUndefined();
     }
+    const analysis = mapMatches(matches, validatedRules, 'billing.tl');
+    expect(analysis.relations).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'includes', source: 'billing', target: 'common.tl' })]),
+    );
+    expect(analysis.uncertainties).toEqual([]);
 
     const nonDefinitionMatches = matches.filter(
       (m) =>

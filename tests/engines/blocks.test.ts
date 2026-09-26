@@ -113,6 +113,50 @@ describe('block tracking (D4, contract/CONTRACT.md §6.6)', () => {
     expect(call?.enclosingSymbol).toBeUndefined();
   });
 
+  it('an unnamed definition (missing name capture) opens no scope; matches inside keep the outer scope (D19 c)', () => {
+    const procOptionalName: RegexRule = {
+      ...procRule,
+      id: 'proc-optional-name',
+      regex: { pattern: '^\\s*PROC(?:\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*))?', flags: 'i', multiline: false },
+    };
+    const text = ['PROC outer', 'PROC', 'CALL x()', 'ENDPROC', 'ENDPROC'].join('\n');
+    const { matches, warnings } = scan([procOptionalName, callRule], text);
+    expect(warnings).toEqual([]);
+    const defs = matches.filter((m) => m.type === 'symbol_definition');
+    expect(defs).toHaveLength(2);
+    expect(defs[1]?.captures.name).toBeUndefined();
+    const call = matches.find((m) => m.type === 'call');
+    expect(call?.enclosingSymbol).toBe('outer');
+  });
+
+  it('an unnamed definition with an empty (not just absent) name capture also opens no scope (D19 c, contract §6.5)', () => {
+    const procEmptyName: RegexRule = {
+      ...procRule,
+      id: 'proc-empty-name',
+      regex: { pattern: '^\\s*PROC\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*|)', flags: 'i', multiline: false },
+    };
+    const text = ['PROC outer', 'PROC ', 'CALL x()', 'ENDPROC', 'ENDPROC'].join('\n');
+    const { matches, warnings } = scan([procEmptyName, callRule], text);
+    expect(warnings).toEqual([]);
+    const call = matches.find((m) => m.type === 'call');
+    expect(call?.enclosingSymbol).toBe('outer');
+  });
+
+  it("an unnamed definition still consumes its own blockEnd via the same-rule LIFO stack (contract §6.6, §9 Q9 b), leaving the outer scope open", () => {
+    const procOptionalName: RegexRule = {
+      ...procRule,
+      id: 'proc-optional-name',
+      regex: { pattern: '^\\s*PROC(?:\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*))?', flags: 'i', multiline: false },
+    };
+    // The unnamed inner PROC's own ENDPROC (the first one, most recently opened) closes it, not
+    // the outer, named scope: "after" is still enclosed by "outer".
+    const text = ['PROC outer', 'PROC', 'ENDPROC', 'CALL after()', 'ENDPROC'].join('\n');
+    const { matches, warnings } = scan([procOptionalName, callRule], text);
+    expect(warnings).toEqual([]);
+    const call = matches.find((m) => m.type === 'call');
+    expect(call?.enclosingSymbol).toBe('outer');
+  });
+
   it('closing an outer scope while an inner (different-rule) scope is still open only closes the outer one', () => {
     // MODULE (no blockEnd) never closes; only PROC/ENDPROC track scopes here, so nest via two proc-like rules
     // with independent blockEnd matching to prove closes are per-rule, not a single global stack.

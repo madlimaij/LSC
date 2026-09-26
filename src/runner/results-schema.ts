@@ -68,8 +68,10 @@ export const RuleResultSchema = z.strictObject({
   /** `sourceEvidence` example ids that were not found in the loaded example set. */
   missingExampleIds: z.array(z.string()),
   examples: z.array(ExampleResultSchema),
-  /** Same shape as the contract's `RuleTests` (docs/PLAN.md §5.2), so WP-10 can write it back unchanged. */
+  /** Same shape as the contract's `RuleTests` (docs/PLAN.md §5.2), so WP-10 can write it back unchanged. Counts only the rule's own examples (D19 a); cross-construct negative failures are in `crossNegativeFailures`. */
   tests: RuleTestsSchema,
+  /** Ids of negative examples of *other* constructs this rule matched (D19 a: "cross-construct negatives", plan §8 step 4). Never counted in `tests`, but a non-empty list still fails the rule (blocks `high`/`medium` confidence and `Results.ok`). */
+  crossNegativeFailures: z.array(z.string()),
   /** `confidence` as declared in the Rule Set file. */
   declaredConfidence: ConfidenceSchema,
   /** Computed by the fixed formula (D8); absent when the rule passes no positive example. */
@@ -111,11 +113,12 @@ export const ResultsSchema = z.strictObject({
   sampleWarnings: z.array(SampleWarningSchema),
   filesScanned: z.array(z.string()),
   /**
-   * `true` when every rule's `tests.failed` is 0, every one of its own
-   * `sourceEvidence` example ids was found (`missingExampleIds` empty), and
-   * it passed at least one positive example (`computedConfidence` defined —
-   * a rule passing no positive example is `rejected`, plan §6.3). Drives the
-   * CLI exit code (WP-05 brief).
+   * `true` when every rule's `tests.failed` is 0, `crossNegativeFailures` is
+   * empty (D19 a: a cross-construct negative match still fails the rule),
+   * every one of its own `sourceEvidence` example ids was found
+   * (`missingExampleIds` empty), and it passed at least one positive example
+   * (`computedConfidence` defined — a rule passing no positive example is
+   * `rejected`, plan §6.3). Drives the CLI exit code (WP-05 brief).
    */
   ok: z.boolean(),
 });
