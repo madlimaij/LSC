@@ -271,6 +271,27 @@ function renderSynthesisAttempts(attempts: NonNullable<Report['synthesis']>['con
 }
 
 /**
+ * WP-10 recompile (`--previous`): one construct's `<li>`, in HTML. See the Markdown renderer's
+ * `renderConstructLine` for the reasoning — a reused construct never shows an attempt count or
+ * attempt list ("0 attempt(s)" would read as untried, not as deliberately kept unchanged); it says
+ * "reused from &lt;version&gt;, no model call" instead, plus its `reuseNote`. A synthesised
+ * construct shows its `reuseNote` (only with `--previous`) next to its attempt count and list.
+ */
+function renderConstructLineHtml(c: NonNullable<Report['synthesis']>['constructs'][number]): string {
+  const head =
+    `<code>${esc(c.constructId)}</code>${c.ruleType !== undefined ? ` (${esc(c.ruleType)})` : ''} &mdash; <strong>${esc(c.status)}</strong>` +
+    `${c.ruleId !== undefined ? ` (rule <code>${esc(c.ruleId)}</code>)` : ''}`;
+  if (c.reusedFrom !== undefined) {
+    return `<li>${head}, reused from ${esc(c.reusedFrom)}, no model call${c.reuseNote !== undefined ? `: ${esc(c.reuseNote)}` : ''}</li>`;
+  }
+  const reuseNotePart = c.reuseNote !== undefined ? ` (${esc(c.reuseNote)})` : '';
+  return (
+    `<li>${head}, ${String(c.attemptCount)} attempt(s)${c.reason !== undefined ? `: ${esc(c.reason)}` : ''}${reuseNotePart}` +
+    `${renderSynthesisAttempts(c.attempts)}</li>`
+  );
+}
+
+/**
  * D27 item d: a `0.0.0-draft` Rule Set (D24 g / D25 item 5) must never be delivered to Navigator.
  */
 function draftWarningHtml(report: Report): string {
@@ -318,21 +339,21 @@ function renderSynthesis(report: Report): string {
     return `<p class="muted">Synthesis details unavailable (pass <code>--synthesis &lt;file&gt;</code> to <code>lsc report</code>).</p>`;
   }
   const s = report.synthesis;
-  const constructs = s.constructs
-    .map(
-      (c) =>
-        `<li><code>${esc(c.constructId)}</code>${c.ruleType !== undefined ? ` (${esc(c.ruleType)})` : ''} &mdash; <strong>${esc(c.status)}</strong>` +
-        `${c.ruleId !== undefined ? ` (rule <code>${esc(c.ruleId)}</code>)` : ''}, ${String(c.attemptCount)} attempt(s)` +
-        `${c.reason !== undefined ? `: ${esc(c.reason)}` : ''}${renderSynthesisAttempts(c.attempts)}</li>`,
-    )
-    .join('');
+  const constructs = s.constructs.map(renderConstructLineHtml).join('');
+  const lexicalReusedPart = s.lexicalStatus === 'reused' && s.lexicalReusedFrom !== undefined ? ` from ${esc(s.lexicalReusedFrom)}, no model call` : '';
   return (
     `<ul class="facts">` +
     renderModelSource(s) +
     `<li>Compile status: <strong>${esc(s.status)}</strong>${s.error !== undefined ? ` &mdash; ${esc(s.error)}` : ''}</li>` +
-    `<li>Lexical settings: <strong>${esc(s.lexicalStatus)}</strong>${s.lexicalReason !== undefined ? ` &mdash; ${esc(s.lexicalReason)}` : ''}</li>` +
+    // WP-10 recompile (`--previous`): present only then.
+    (s.reuse !== undefined
+      ? `<li>Recompile: from version <code>${esc(s.reuse.previousVersion)}</code>${s.reuse.force ? ' (<strong>--force</strong>: nothing reused)' : ''}</li>`
+      : '') +
+    `<li>Lexical settings: <strong>${esc(s.lexicalStatus)}</strong>${lexicalReusedPart}` +
+    `${s.lexicalReason !== undefined ? ` &mdash; ${esc(s.lexicalReason)}` : ''}${s.lexicalReuseNote !== undefined ? ` &mdash; ${esc(s.lexicalReuseNote)}` : ''}</li>` +
     `<li>Constructs: ${String(s.summary.constructs)} (validated ${String(s.summary.validated)}, rejected ${String(s.summary.rejected)}, ` +
-    `not justified ${String(s.summary.notJustified)}, skipped ${String(s.summary.skipped)}, not attempted ${String(s.summary.notAttempted)})</li>` +
+    `not justified ${String(s.summary.notJustified)}, skipped ${String(s.summary.skipped)}, not attempted ${String(s.summary.notAttempted)}` +
+    `${s.summary.reused !== undefined ? `, reused ${String(s.summary.reused)}` : ''})</li>` +
     `<li>Model usage: ${String(s.usage.calls)} call(s), ${String(s.usage.inputTokens)} input + ${String(s.usage.outputTokens)} output tokens</li>` +
     `</ul><ul>${constructs}</ul>`
   );

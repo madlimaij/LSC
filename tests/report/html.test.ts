@@ -56,6 +56,55 @@ function fakeSynthesisWithHandWrittenModelSource(): SynthesisReport {
   };
 }
 
+const RUSE_CONSTRUCT_IDS = ['module-declaration', 'proc-definition', 'call-statement', 'include-directive', 'db-read', 'db-write', 'config-flag', 'entry-point'];
+
+/**
+ * WP-07 follow-up: a `synthesis.json` shaped like `lsc compile --previous` (src/synth/README.md
+ * "Recompile" section) — every construct but `db-write` reused unchanged from `1.0.0`, `db-write`
+ * synthesised again because its Skill file changed. Built with the schema types directly, like
+ * `tests/synth/recompile-cli.test.ts` and `tests/report/synthesis-view.test.ts` do, rather than
+ * running a real compile.
+ */
+function fakeReuseSynthesis(): SynthesisReport {
+  return {
+    languageId: 'toylang',
+    compilerVersion: '0.1.0',
+    generatedAt: '2026-09-26T00:00:00.000Z',
+    status: 'completed',
+    maxAttemptsPerConstruct: 3,
+    reuse: { previousVersion: '1.0.0', force: false },
+    lexical: {
+      status: 'reused',
+      reusedFrom: '1.0.0',
+      reuseNote: 'general Skill file(s) unchanged since 1.0.0: language-basics.md',
+      settings: { fileMatchers: ['**/*.tl'] },
+      attempts: [],
+    },
+    constructs: RUSE_CONSTRUCT_IDS.map((constructId) =>
+      constructId === 'db-write'
+        ? {
+            constructId,
+            ruleType: 'db_write' as const,
+            status: 'validated' as const,
+            ruleId: 'db-write',
+            reuseNote: 'Skill file(s) changed or new: db-write.md',
+            attempts: [{ attempt: 1, requestHash: 'a'.repeat(64), outcome: 'passed' as const, problems: [], usage: { inputTokens: 5, outputTokens: 5 } }],
+          }
+        : {
+            constructId,
+            status: 'validated' as const,
+            ruleId: constructId,
+            reusedFrom: '1.0.0',
+            reuseNote: `Skill file(s) unchanged since 1.0.0: ${constructId}.md`,
+            attempts: [],
+          },
+    ),
+    summary: { constructs: 8, validated: 8, rejected: 0, notJustified: 0, skipped: 0, notAttempted: 0, reused: 7 },
+    usage: { inputTokens: 5, outputTokens: 5, calls: 1 },
+    ingestDiagnostics: [],
+  };
+}
+
 describe('renderHtml', () => {
   it('is a single self-contained HTML document: no external assets, no remote requests', () => {
     const results = runFixture(loadFixtureRuleSet(), loadSampleFiles());
@@ -257,5 +306,50 @@ describe('renderHtml', () => {
     const html = renderHtml(report);
     expect(html).toContain('new-construct.md');
     expect(html).toContain('not used by this Rule Set');
+  });
+
+  // WP-07 follow-up: `lsc compile --previous` reuses unchanged rules (docs/progress.md "WP-10 compile
+  // wiring", synthesis.json's new `reuse`/`reusedFrom`/`reuseNote`/`summary.reused` fields).
+  describe('recompile (--previous) fields', () => {
+    it('a reused construct says "reused from <version>, no model call" plus its reuseNote, and never looks like 0 failed attempts', () => {
+      const report = buildReport(runFixture(), { synthesis: fakeReuseSynthesis() });
+      const html = renderHtml(report);
+      const synthesisSection = html.slice(html.indexOf('<h2>Synthesis</h2>'));
+      expect(synthesisSection).toContain('<code>module-declaration</code>');
+      expect(synthesisSection).toContain('reused from 1.0.0, no model call: Skill file(s) unchanged since 1.0.0: module-declaration.md');
+      expect(synthesisSection).not.toMatch(/module-declaration[^<]*<\/code>[^<]*0 attempt\(s\)/);
+      expect(synthesisSection).not.toMatch(/module-declaration[\s\S]*?no attempts recorded/);
+    });
+
+    it('a construct that was not reused shows its reuseNote next to its attempts, not the reused wording', () => {
+      const report = buildReport(runFixture(), { synthesis: fakeReuseSynthesis() });
+      const html = renderHtml(report);
+      const synthesisSection = html.slice(html.indexOf('<h2>Synthesis</h2>'));
+      expect(synthesisSection).toContain(
+        '<code>db-write</code> (db_write) &mdash; <strong>validated</strong> (rule <code>db-write</code>), 1 attempt(s) (Skill file(s) changed or new: db-write.md)',
+      );
+      expect(synthesisSection).toContain('attempt 1: <strong>passed</strong>');
+      expect(synthesisSection).not.toMatch(/db-write<\/code>[^<]*reused from/);
+    });
+
+    it('reused lexical settings show "reused from <version>" with the note', () => {
+      const report = buildReport(runFixture(), { synthesis: fakeReuseSynthesis() });
+      const html = renderHtml(report);
+      const synthesisSection = html.slice(html.indexOf('<h2>Synthesis</h2>'));
+      expect(synthesisSection).toContain('Lexical settings: <strong>reused</strong> from 1.0.0, no model call');
+      expect(synthesisSection).toContain('general Skill file(s) unchanged since 1.0.0: language-basics.md');
+    });
+
+    it('the Summary paragraph mentions the recompile in plain words', () => {
+      const report = buildReport(runFixture(), { synthesis: fakeReuseSynthesis() });
+      const html = renderHtml(report);
+      expect(html).toContain('Recompiled from version 1.0.0: 7 rules reused unchanged, 1 rule rebuilt (db-write).');
+    });
+
+    it('when synthesis.json has no reuse fields, nothing changes: no "reused"/"recompiled" wording appears', () => {
+      const report = buildReport(runFixture(), { synthesis: fakeSynthesisWithHandWrittenModelSource() });
+      const html = renderHtml(report);
+      expect(html).not.toMatch(/reused from|Recompiled from version/);
+    });
   });
 });

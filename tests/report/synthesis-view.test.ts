@@ -82,4 +82,55 @@ describe('buildSynthesisView', () => {
     expect(entryPoint?.reason).toBe('compile aborted');
     expect(entryPoint?.attemptCount).toBe(0);
   });
+
+  // WP-07 follow-up: WP-10's `lsc compile --previous` reuse fields (docs/progress.md "WP-10 compile
+  // wiring") must reach the report's view unchanged, so the renderers can show them.
+  it('carries the top-level reuse info, a reused lexical status and per-construct reusedFrom/reuseNote', () => {
+    const synthesis = baseSynthesis({
+      reuse: { previousVersion: '1.0.0', force: false },
+      lexical: {
+        status: 'reused',
+        reusedFrom: '1.0.0',
+        reuseNote: 'general Skill file(s) unchanged since 1.0.0: language-basics.md',
+        settings: { fileMatchers: ['**/*.tl'] },
+        attempts: [],
+      },
+      constructs: [
+        { constructId: 'db-write', status: 'validated', ruleId: 'db-write', reuseNote: 'Skill file(s) changed or new: db-write.md', attempts: [] },
+        {
+          constructId: 'db-read',
+          status: 'validated',
+          ruleId: 'db-read',
+          reusedFrom: '1.0.0',
+          reuseNote: 'Skill file(s) unchanged since 1.0.0: db-read.md',
+          attempts: [],
+        },
+      ],
+      summary: { constructs: 2, validated: 2, rejected: 0, notJustified: 0, skipped: 0, notAttempted: 0, reused: 1 },
+    });
+
+    const view = buildSynthesisView(synthesis);
+
+    expect(view.reuse).toEqual({ previousVersion: '1.0.0', force: false });
+    expect(view.lexicalStatus).toBe('reused');
+    expect(view.lexicalReusedFrom).toBe('1.0.0');
+    expect(view.lexicalReuseNote).toBe('general Skill file(s) unchanged since 1.0.0: language-basics.md');
+    expect(view.summary.reused).toBe(1);
+
+    const dbWrite = view.constructs.find((c) => c.constructId === 'db-write');
+    expect(dbWrite?.reusedFrom).toBeUndefined();
+    expect(dbWrite?.reuseNote).toBe('Skill file(s) changed or new: db-write.md');
+
+    const dbRead = view.constructs.find((c) => c.constructId === 'db-read');
+    expect(dbRead?.reusedFrom).toBe('1.0.0');
+    expect(dbRead?.reuseNote).toBe('Skill file(s) unchanged since 1.0.0: db-read.md');
+  });
+
+  it('a synthesis.json without reuse fields produces a view without them', () => {
+    const view = buildSynthesisView(baseSynthesis());
+    expect(view.reuse).toBeUndefined();
+    expect(view.lexicalReusedFrom).toBeUndefined();
+    expect(view.lexicalReuseNote).toBeUndefined();
+    expect(view.summary.reused).toBeUndefined();
+  });
 });

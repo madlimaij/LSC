@@ -78,6 +78,51 @@ function rejectLikeReport() {
   return buildReport(results, { ruleSet, examplesById: fixtureExamplesById(), synthesis });
 }
 
+/**
+ * WP-07 follow-up: a `synthesis.json` shaped like `lsc compile --previous` (src/synth/README.md
+ * "Recompile" section) — every construct but `db-write` reused unchanged from `1.0.0`.
+ */
+function fakeReuseSynthesis(): SynthesisReport {
+  const constructIds = ['module-declaration', 'proc-definition', 'call-statement', 'include-directive', 'db-read', 'db-write', 'config-flag', 'entry-point'];
+  return {
+    languageId: 'toylang',
+    compilerVersion: '0.1.0',
+    generatedAt: '2026-09-26T00:00:00.000Z',
+    status: 'completed',
+    maxAttemptsPerConstruct: 3,
+    reuse: { previousVersion: '1.0.0', force: false },
+    lexical: {
+      status: 'reused',
+      reusedFrom: '1.0.0',
+      reuseNote: 'general Skill file(s) unchanged since 1.0.0: language-basics.md',
+      settings: { fileMatchers: ['**/*.tl'] },
+      attempts: [],
+    },
+    constructs: constructIds.map((constructId) =>
+      constructId === 'db-write'
+        ? {
+            constructId,
+            ruleType: 'db_write' as const,
+            status: 'validated' as const,
+            ruleId: 'db-write',
+            reuseNote: 'Skill file(s) changed or new: db-write.md',
+            attempts: [{ attempt: 1, requestHash: 'a'.repeat(64), outcome: 'passed' as const, problems: [], usage: { inputTokens: 5, outputTokens: 5 } }],
+          }
+        : {
+            constructId,
+            status: 'validated' as const,
+            ruleId: constructId,
+            reusedFrom: '1.0.0',
+            reuseNote: `Skill file(s) unchanged since 1.0.0: ${constructId}.md`,
+            attempts: [],
+          },
+    ),
+    summary: { constructs: 8, validated: 8, rejected: 0, notJustified: 0, skipped: 0, notAttempted: 0, reused: 7 },
+    usage: { inputTokens: 5, outputTokens: 5, calls: 1 },
+    ingestDiagnostics: [],
+  };
+}
+
 describe('buildReport summary (D28)', () => {
   it('a healthy, hand-written, still-draft Rule Set with unreviewed sample matches lists exactly the review, hand-written and export items, in order', () => {
     const results = { ...runFixture(undefined, loadSampleFiles()), ruleSetVersion: '0.0.0-draft' };
@@ -143,5 +188,37 @@ describe('buildReport summary (D28)', () => {
     const html = renderHtml(report);
     const summarySectionHtml = html.slice(html.indexOf('<div class="summary-box'), html.indexOf('<div class="verdict-box'));
     expect(summarySectionHtml).not.toMatch(INTERNAL_REFERENCE);
+  });
+
+  // WP-07 follow-up: `lsc compile --previous` reuses unchanged rules (docs/progress.md "WP-10 compile
+  // wiring"). The summary must name the recompile in plain words and keep "what to do next" correct.
+  describe('recompile (--previous)', () => {
+    it('mentions the recompile in plain words: reused count, rebuilt count and which construct(s) were rebuilt', () => {
+      const report = buildReport(runFixture(), { synthesis: fakeReuseSynthesis() });
+      expect(report.summary.paragraphs).toContain('Recompiled from version 1.0.0: 7 rules reused unchanged, 1 rule rebuilt (db-write).');
+    });
+
+    it('"what to do next" stays correct: nothing to review and every rule passing means an empty list and "ready"', () => {
+      const report = buildReport(runFixture(), { synthesis: fakeReuseSynthesis() });
+      expect(report.summary.whatNext).toEqual([]);
+      expect(report.summary.status).toBe('ready');
+    });
+
+    it('says everything was rebuilt with --force, and names no reused rules', () => {
+      const forced = fakeReuseSynthesis();
+      const forcedSynthesis: SynthesisReport = {
+        ...forced,
+        reuse: { previousVersion: '1.0.0', force: true },
+        summary: { ...forced.summary, reused: 0 },
+        constructs: forced.constructs.map((c) => ({ ...c, reusedFrom: undefined, reuseNote: '--force' })),
+      };
+      const report = buildReport(runFixture(), { synthesis: forcedSynthesis });
+      expect(report.summary.paragraphs).toContain("Recompiled from version 1.0.0 with `--force`: everything was rebuilt, nothing was reused.");
+    });
+
+    it('has no effect when synthesis.json has no reuse fields', () => {
+      const report = buildReport(runFixture(), { synthesis: fakeSynthesis() });
+      expect(report.summary.paragraphs.some((p) => p.includes('Recompiled from version'))).toBe(false);
+    });
   });
 });

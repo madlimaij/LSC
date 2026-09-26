@@ -161,6 +161,14 @@ export interface SynthesisConstructView {
   readonly ruleId?: string;
   readonly attemptCount: number;
   readonly attempts: readonly SynthesisAttemptView[];
+  /**
+   * WP-10 recompile (`--previous`): version of the previous exported Rule Set whose rule was reused,
+   * with no model call (`attempts` is empty — this is not a construct with 0 failed attempts).
+   * Absent when the construct was synthesised this run.
+   */
+  readonly reusedFrom?: string;
+  /** WP-10 recompile: why the previous rule was reused, or (when `reusedFrom` is absent) why it was synthesised again instead. Only with `--previous`. */
+  readonly reuseNote?: string;
 }
 
 export interface SynthesisUsageView {
@@ -191,11 +199,26 @@ export interface SynthesisView {
   readonly error?: string;
   readonly lexicalStatus: string;
   readonly lexicalReason?: string;
+  /** WP-10 recompile: version of the previous Rule Set whose lexical settings were reused (`lexicalStatus: "reused"`). */
+  readonly lexicalReusedFrom?: string;
+  /** WP-10 recompile: why the lexical settings were reused, or synthesised again instead. Only with `--previous`. */
+  readonly lexicalReuseNote?: string;
   /** D27 item e: every lexical-settings attempt, proposed and accepted/refused, in order. */
   readonly lexicalAttempts: readonly LexicalAttemptView[];
   readonly constructs: readonly SynthesisConstructView[];
-  readonly summary: { readonly constructs: number; readonly validated: number; readonly rejected: number; readonly notJustified: number; readonly skipped: number; readonly notAttempted: number };
+  readonly summary: {
+    readonly constructs: number;
+    readonly validated: number;
+    readonly rejected: number;
+    readonly notJustified: number;
+    readonly skipped: number;
+    readonly notAttempted: number;
+    /** WP-10 recompile: constructs whose previous rule was reused (they also count in `validated`). Only with `--previous`. */
+    readonly reused?: number;
+  };
   readonly usage: SynthesisUsageView;
+  /** WP-10 recompile: present when `lsc compile --previous` was given. */
+  readonly reuse?: { readonly previousVersion: string; readonly force: boolean };
   /** Present when `synthesis.json` has `modelSource` (every file written after this follow-up); rendered instead of `providerNote`. */
   readonly modelSource?: SynthesisModelSourceView;
   /** Present only when `modelSource` is absent (a `synthesis.json` written before it existed): says so instead of silently omitting the section. */

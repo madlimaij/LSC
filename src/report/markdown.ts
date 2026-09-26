@@ -12,6 +12,7 @@ import type {
   RepresentativeMatchEntry,
   RuleReport,
   SynthesisAttemptView,
+  SynthesisConstructView,
   SynthesisView,
   WrongCaptureEntry,
 } from './model.js';
@@ -424,6 +425,28 @@ function renderSynthesisAttempts(attempts: readonly SynthesisAttemptView[]): str
 }
 
 /**
+ * WP-10 recompile (`--previous`): one construct's line, in Markdown. A reused construct
+ * (`reusedFrom` set) never shows an attempt count or attempt list — "0 attempt(s)" would read as a
+ * construct nobody tried, not as one deliberately kept unchanged — it says "reused from <version>, no
+ * model call" instead, plus its `reuseNote`. A synthesised construct shows its `reuseNote` (present
+ * only with `--previous`, e.g. "Skill file(s) changed or new: db-write.md" or "--force") next to its
+ * attempt count, alongside the ordinary attempt list.
+ */
+function renderConstructLine(c: SynthesisConstructView): string {
+  const head =
+    `- \`${c.constructId}\`${c.ruleType !== undefined ? ` (${c.ruleType})` : ''} — **${c.status}**` +
+    `${c.ruleId !== undefined ? ` (rule \`${c.ruleId}\`)` : ''}`;
+  if (c.reusedFrom !== undefined) {
+    return `${head}, reused from ${c.reusedFrom}, no model call${c.reuseNote !== undefined ? `: ${c.reuseNote}` : ''}`;
+  }
+  const reuseNotePart = c.reuseNote !== undefined ? ` (${c.reuseNote})` : '';
+  return (
+    `${head}, ${String(c.attemptCount)} attempt(s)${c.reason !== undefined ? `: ${c.reason}` : ''}${reuseNotePart}` +
+    `\n${renderSynthesisAttempts(c.attempts)}`
+  );
+}
+
+/**
  * `modelSource` line, shown at the top of the Synthesis section (D25 item 2, WP-07 follow-up:
  * "show it prominently ... at the top of the Synthesis section"). Falls back to the "not recorded"
  * `providerNote` for a `synthesis.json` written before `modelSource` existed.
@@ -449,20 +472,23 @@ function renderSynthesis(report: Report): string {
   }
   const s = report.synthesis;
   const modelSourceLines = renderModelSource(s).trimEnd();
+  const lexicalReusedPart = s.lexicalStatus === 'reused' && s.lexicalReusedFrom !== undefined ? ` from ${s.lexicalReusedFrom}, no model call` : '';
   const lines = [
     ...(modelSourceLines.length > 0 ? [modelSourceLines] : []),
     `- Compile status: **${s.status}**${s.error !== undefined ? ` — ${s.error}` : ''}`,
-    `- Lexical settings: **${s.lexicalStatus}**${s.lexicalReason !== undefined ? ` — ${s.lexicalReason}` : ''}`,
+    // WP-10 recompile (`--previous`): present only then. "Recompiled from …" mirrors the reused/rebuilt
+    // wording of the top-of-report Summary paragraph (summary.ts) so a reader sees the same story twice.
+    ...(s.reuse !== undefined
+      ? [`- Recompile: from version \`${s.reuse.previousVersion}\`${s.reuse.force ? ' (**--force**: nothing reused)' : ''}`]
+      : []),
+    `- Lexical settings: **${s.lexicalStatus}**${lexicalReusedPart}` +
+      `${s.lexicalReason !== undefined ? ` — ${s.lexicalReason}` : ''}${s.lexicalReuseNote !== undefined ? ` — ${s.lexicalReuseNote}` : ''}`,
     `- Constructs: ${String(s.summary.constructs)} (validated ${String(s.summary.validated)}, rejected ${String(s.summary.rejected)}, ` +
-      `not justified ${String(s.summary.notJustified)}, skipped ${String(s.summary.skipped)}, not attempted ${String(s.summary.notAttempted)})`,
+      `not justified ${String(s.summary.notJustified)}, skipped ${String(s.summary.skipped)}, not attempted ${String(s.summary.notAttempted)}` +
+      `${s.summary.reused !== undefined ? `, reused ${String(s.summary.reused)}` : ''})`,
     `- Model usage: ${String(s.usage.calls)} call(s), ${String(s.usage.inputTokens)} input + ${String(s.usage.outputTokens)} output tokens`,
     '',
-    ...s.constructs.map(
-      (c) =>
-        `- \`${c.constructId}\`${c.ruleType !== undefined ? ` (${c.ruleType})` : ''} — **${c.status}**` +
-        `${c.ruleId !== undefined ? ` (rule \`${c.ruleId}\`)` : ''}, ${String(c.attemptCount)} attempt(s)` +
-        `${c.reason !== undefined ? `: ${c.reason}` : ''}\n${renderSynthesisAttempts(c.attempts)}`,
-    ),
+    ...s.constructs.map(renderConstructLine),
   ];
   return lines.join('\n');
 }

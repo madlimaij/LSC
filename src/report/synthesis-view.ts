@@ -84,6 +84,10 @@ export function buildSynthesisView(synthesis: SynthesisReport): SynthesisView {
       outcome: attempt.outcome,
       problems: attempt.problems.map(redactReviewProblem),
     })),
+    // WP-10 recompile (--previous): no repository-sample text is ever involved in a reuse decision
+    // (it compares Skill-file hashes and re-runs the runner), so neither field needs redaction.
+    ...(construct.reusedFrom !== undefined ? { reusedFrom: construct.reusedFrom } : {}),
+    ...(construct.reuseNote !== undefined ? { reuseNote: construct.reuseNote } : {}),
   }));
 
   const usage: SynthesisUsageView = { inputTokens: synthesis.usage.inputTokens, outputTokens: synthesis.usage.outputTokens, calls: synthesis.usage.calls };
@@ -94,10 +98,21 @@ export function buildSynthesisView(synthesis: SynthesisReport): SynthesisView {
     ...(synthesis.error !== undefined ? { error: synthesis.error } : {}),
     lexicalStatus: synthesis.lexical.status,
     ...(synthesis.lexical.reason !== undefined ? { lexicalReason: synthesis.lexical.reason } : {}),
+    ...(synthesis.lexical.reusedFrom !== undefined ? { lexicalReusedFrom: synthesis.lexical.reusedFrom } : {}),
+    ...(synthesis.lexical.reuseNote !== undefined ? { lexicalReuseNote: synthesis.lexical.reuseNote } : {}),
     lexicalAttempts: buildLexicalAttempts(synthesis),
     constructs,
-    summary: { ...synthesis.summary },
+    summary: {
+      constructs: synthesis.summary.constructs,
+      validated: synthesis.summary.validated,
+      rejected: synthesis.summary.rejected,
+      notJustified: synthesis.summary.notJustified,
+      skipped: synthesis.summary.skipped,
+      notAttempted: synthesis.summary.notAttempted,
+      ...(synthesis.summary.reused !== undefined ? { reused: synthesis.summary.reused } : {}),
+    },
     usage,
+    ...(synthesis.reuse !== undefined ? { reuse: synthesis.reuse } : {}),
     // modelSource replaces providerNote (WP-07 follow-up, D25 item 2): older synthesis.json files
     // (no modelSource) still get a clear "not recorded" note instead of the section going silent.
     ...(modelSource !== undefined ? { modelSource } : { providerNote: PROVIDER_NOTE }),

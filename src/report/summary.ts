@@ -67,6 +67,25 @@ function statusParagraph(report: SummaryReport): string {
   return [modelClause, sampleClause, usableClause].filter((part): part is string => part !== undefined).join(' ');
 }
 
+/**
+ * WP-07 follow-up: names the recompile in plain words when `synthesis.json` has `reuse` (i.e. this
+ * compile was run with `lsc compile --previous`), so a reader sees at a glance how much of the Rule
+ * Set is new work versus carried over unchanged, without opening `synthesis.json`.
+ */
+function recompileParagraph(report: SummaryReport): string | undefined {
+  const { synthesis } = report;
+  if (synthesis?.reuse === undefined) return undefined;
+  const { previousVersion, force } = synthesis.reuse;
+  const reused = synthesis.summary.reused ?? 0;
+  const rebuiltIds = synthesis.constructs.filter((c) => c.reusedFrom === undefined).map((c) => c.constructId);
+  if (force) {
+    return `Recompiled from version ${previousVersion} with \`--force\`: everything was rebuilt, nothing was reused.`;
+  }
+  const rebuiltClause =
+    rebuiltIds.length > 0 ? `${plural(rebuiltIds.length, 'rule')} rebuilt (${rebuiltIds.join(', ')})` : `${plural(0, 'rule')} rebuilt`;
+  return `Recompiled from version ${previousVersion}: ${plural(reused, 'rule')} reused unchanged, ${rebuiltClause}.`;
+}
+
 function rejectedRuleItems(report: SummaryReport): string[] {
   return report.rules
     .filter((rule) => !rule.ok)
@@ -127,9 +146,10 @@ function buildStatus(report: SummaryReport, whatNext: readonly string[]): Summar
 /** Builds the report's top-of-document `Summary` from the rest of the already-assembled `Report`. */
 export function buildSummary(report: SummaryReport): Summary {
   const whatNext = buildWhatNext(report);
+  const recompile = recompileParagraph(report);
   return {
     status: buildStatus(report, whatNext),
-    paragraphs: [ruleParagraph(report), statusParagraph(report)],
+    paragraphs: [ruleParagraph(report), statusParagraph(report), ...(recompile !== undefined ? [recompile] : [])],
     whatNext,
   };
 }

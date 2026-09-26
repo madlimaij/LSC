@@ -12,7 +12,7 @@
 | WP-07 | Report + review CLI | report-builder | WP-05 | done (G2 approved) |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | done (reviewed wave 3, round 2); real run deferred to G4 (D25) |
-| WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | export done; compile wiring with llm-integrator in progress |
+| WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | done (awaiting wave 4 review) |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
 | WP-12 | Extra engines (conditional) | engine-builder | WP-11 | not started |
 
@@ -581,3 +581,33 @@ Cross-folder part of WP-10, requests (a)–(d) of the WP-10 completion note, bui
 - report-builder: show `reusedFrom` / `reuseNote` ("reused from 1.0.0, no model call"). Today a reused construct shows `attemptCount: 0` and the lexical status prints as `reused`, which is correct but not explained.
 - The contract-architect open questions still apply: constructs rejected or not justified last time are always re-synthesised, and a lexical change does not force construct re-synthesis (reused rules are only re-tested under the new settings).
 - `src/cli/commands/README.md` (not owned here) does not describe `lsc compile`. The flags are documented in `src/synth/README.md`.
+
+### WP-07 follow-up: reused rules in the report (`report-builder`, 2026-09-26)
+
+Small follow-up to WP-07/WP-10: shows `synthesis.json`'s new recompile fields (`reuse`,
+`lexical.status: "reused"`/`reusedFrom`/`reuseNote`, `constructs[].reusedFrom`/`reuseNote`,
+`summary.reused`, commit c2327d9) in both report formats, per `src/synth/README.md`'s
+"Recompile: `--previous`, `--force`, `--export`" section.
+
+**What was built**
+- `src/report/model.ts`: `SynthesisConstructView.reusedFrom`/`reuseNote`; `SynthesisView.lexicalReusedFrom`/`lexicalReuseNote`/`reuse`; `summary.reused` on `SynthesisView['summary']`. All optional.
+- `src/report/synthesis-view.ts`: `buildSynthesisView` carries all the new fields through unredacted (a reuse decision never involves repository-sample text, so nothing here needs `redactReviewProblem`).
+- `src/report/markdown.ts`: `renderConstructLine` — a reused construct (`reusedFrom` set) never shows an attempt count or attempt list; it says "reused from `<version>`, no model call" plus its `reuseNote`, instead of looking like a construct that ran and produced 0 attempts. A synthesised construct shows its `reuseNote` (only present with `--previous`) next to its attempt count and list, unchanged otherwise. The Synthesis section also gets a "Recompile: from version …" line when `reuse` is present, and the lexical-settings and constructs-count lines show "reused from `<version>`, no model call" / ", reused N" respectively.
+- `src/report/html.ts`: the same, as `renderConstructLineHtml` plus the equivalent lines in `renderSynthesis`.
+- `src/report/summary.ts`: `recompileParagraph` — appended to `Summary.paragraphs` only when `synthesis.reuse` is present: "Recompiled from version `<v>`: N rules reused unchanged, M rule(s) rebuilt (`id`, …)." or, with `--force`, "Recompiled from version `<v>` with `--force`: everything was rebuilt, nothing was reused." `buildWhatNext` needed no change: a reused rule is re-tested by the runner and is `ok` like any other validated rule, so `rejectedRuleItems`/`notJustifiedConstructItems` already treat it correctly; this is asserted directly (empty `whatNext`, status `ready`, for an all-reused-but-one healthy recompile).
+- Tests: `tests/report/markdown.test.ts`, `tests/report/html.test.ts` (`describe('recompile (--previous) fields' ...)`, 5 tests each), `tests/report/summary.test.ts` (`describe('recompile (--previous)' ...)`, 4 tests), `tests/report/synthesis-view.test.ts` (2 tests: fields carried through; absent when `synthesis.json` has none). All built with the schema types directly (`SynthesisReport` object literals), the same way the existing `fakeSynthesisWithHandWrittenModelSource`/`fakeSynthesis` helpers in those files already do, rather than importing `tests/synth/recompile-cli.test.ts`/`tests/release/scenarios.ts` (those run a real, slower end-to-end compile; the schema-literal route was simpler and sufficient here).
+
+**Acceptance criteria**
+- Each reused construct says "reused from `<version>`, no model call" with its `reuseNote`, and is never rendered with an attempt count/list: **met** (`markdown.test.ts`/`html.test.ts` "a reused construct says …", asserting both the positive text and the absence of "0 attempt(s)"/"no attempts recorded" next to it).
+- Constructs that weren't reused show their `reuseNote` next to their attempts: **met** (`db-write` case in both formats, plus the `--force` case in `summary.test.ts`).
+- Reused lexical settings show "reused from `<version>`" with the note: **met**.
+- The Summary paragraph mentions the recompile in plain words, and "what to do next" stays correct: **met** (`Recompiled from version 1.0.0: 7 rules reused unchanged, 1 rule rebuilt (db-write).`; `whatNext` empty/`status: 'ready'` for the healthy case).
+- No `reuse` fields in `synthesis.json` → nothing changes: **met** (explicit tests in all three files asserting no "reused from"/"Recompiled from version" text, and a synthesis-view test asserting the view fields are simply absent).
+- `npm run typecheck`, `npm run lint`: clean. `npm test`: 70 files, 740 tests passed (724 before + 16).
+
+**Deviations from the brief**
+- One `exactOptionalPropertyTypes` fix was needed beyond the stated scope: `buildSynthesisView`'s `summary` field had to be built explicitly (not `{ ...synthesis.summary }`) because the schema's `reused?: number` widens to `number | undefined`, which TS's `exactOptionalPropertyTypes: true` rejects when spread into the view's `reused?: number`.
+- Built test inputs with the schema types directly rather than importing `tests/synth/recompile-cli.test.ts`/`tests/release/scenarios.ts` (both were offered as an option in the brief); this matched the existing style of every other synthesis fixture already in these three test files and avoided the cost of a real end-to-end compile per test.
+
+**Open questions**
+- None new. The two prior open questions in the WP-10 note above (constructs rejected/not-justified last time always re-synthesised; a lexical change does not force construct re-synthesis) are unaffected by this follow-up — it only changes how the existing fields are displayed.
