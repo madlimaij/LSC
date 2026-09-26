@@ -6,7 +6,7 @@
  * JSON Schema (`npm run contract:export`) and add a docs/DECISIONS.md entry.
  */
 
-export const CONTRACT_VERSION = '1.0.0';
+export const CONTRACT_VERSION = '1.0.1';
 
 /** Semantic Versioning 2.0.0 (https://semver.org), capture groups made non-capturing. */
 export const SEMVER_PATTERN =

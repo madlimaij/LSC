@@ -15,9 +15,14 @@ describe('valid fixture contract/fixtures/toylang.ruleset.json', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('uses contractVersion 1.0.0', () => {
-    expect(CONTRACT_VERSION).toBe('1.0.0');
+  it('is a 1.0.0 file accepted by the 1.0.1 validator (older patch, D20)', () => {
+    expect(CONTRACT_VERSION).toBe('1.0.1');
     expect(result.ok && result.ruleSet.contractVersion).toBe('1.0.0');
+  });
+
+  it('validates unchanged when stamped with the current contract version', () => {
+    const current = { ...(readJson(VALID_FIXTURE) as Record<string, unknown>), contractVersion: CONTRACT_VERSION };
+    expect(validateRuleSet(current).issues).toEqual([]);
   });
 
   it('covers every rule type and both engines', () => {
