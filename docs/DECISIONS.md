@@ -198,3 +198,18 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
   d. Version impact: patch 1.0.3 (CONTRACT.md §2: wording and documentation only; no change to which files are valid or what they mean). `CONTRACT_VERSION` bumped, JSON Schema re-exported (only the version strings change). The fixture Rule Set keeps `contractVersion: "1.0.0"`.
 - **Reason:** a: the contract text was unambiguous and matched the producer; only the fixture was wrong (found by `report-builder` in WP-07). b: the fixture and the producer already agreed except for the prefix; writing the convention down stops the same drift for `skill`. c: wave 2 reviewer finding; 1.0.2 said "innermost named scope" in one sentence of §6.6 but "open scope" elsewhere.
 - **Affects:** Navigator (new schema file and CONTRACT.md 1.0.3 before any Rule Set ships, §8 item 5; no behaviour change). WP-07: `tests/report/cli-report.test.ts` no longer needs to replace the fixture's `sourceSkills` to exercise the hash check. WP-10.
+
+## D27 — G2 held: one more report round before approval
+
+- **Date:** 2026-09-26
+- **Author:** orchestrator, recording the project owner's decision at G2
+- **Decision:** G2 is not approved yet. The owner accepted the orchestrator's proposal: `report-builder` fixes the five remaining WP-07 defects from the wave 3 round-2 review, plus these report changes:
+  a. The "not produced by a real model" label also goes in or next to the verdict.
+  b. The report says plainly that it shows sample matches only, not sample misses. "No sample scanned" reads differently from "no unreviewed matches".
+  c. A per-rule count table of unreviewed matches near the top.
+  d. A rejected rule says `rejected` and that export drops it. The report warns that a `0.0.0-draft` Rule Set must not be delivered to Navigator.
+  e. Refused lexical proposals are shown.
+  f. The confidence level is not repeated.
+  Then a targeted re-review, the regenerated reports, and the G2 question again. This round goes beyond the two-round limit in docs/ORCHESTRATION.md §5, at the owner's request.
+- **Reason:** The reviewer judged the report "nearly, but not yet" sufficient to decide whether a Rule Set can be trusted.
+- **Affects:** WP-07 only.
