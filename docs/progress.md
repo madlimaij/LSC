@@ -6,9 +6,9 @@
 | WP-01 | Skeleton and tooling | contract-architect | — | done (reviewed wave 1) |
 | WP-02 | Rule Set contract | contract-architect | WP-01 | done (reviewed wave 1) |
 | WP-03 | Example format + toylang | contract-architect | WP-02 | done (reviewed wave 1) |
-| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | review round 2: changes required (owner asked) |
-| WP-05 | Test runner | engine-builder | WP-04 | review round 2: changes required (owner asked) |
-| WP-06 | Skill ingestion | skill-ingester | WP-03 | review round 2: changes required (owner asked) |
+| WP-04 | Rule engines | engine-builder | WP-02, WP-03 | round 3: one finding (fallback source), fix in progress |
+| WP-05 | Test runner | engine-builder | WP-04 | done (reviewed wave 2, round 3) |
+| WP-06 | Skill ingestion | skill-ingester | WP-03 | done (reviewed wave 2, round 3) |
 | WP-07 | Report + review CLI | report-builder | WP-05 | not started |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | not started |
