@@ -221,3 +221,11 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
 - **Decision:** The owner asked for the reports to be easier to understand, with a summary at the beginning, and to be told what needs to be done. `report-builder` adds a plain-language summary at the top of both formats and a "What to do next" list worked out from the results. It also simplifies wording in the verdict and coverage areas, keeping the detailed sections. The four remaining findings from the targeted G2-round review go into the same change. The orchestrator confirms the one-line change report-builder made to `tests/synth/compile-cli.test.ts` in 169d77c (it followed directly from the D27 A5 wording change).
 - **Reason:** The owner's request at G2.
 - **Affects:** WP-07 (src/report/). G2 stays open until the owner has seen the result.
+
+## D29 — Gate G2 approved
+
+- **Date:** 2026-09-26
+- **Author:** orchestrator, recording the project owner's decision at G2
+- **Decision:** The project owner approved G2: the validation report (with the D28 summary and "What to do next" list) is understandable enough to decide whether a Rule Set can be trusted. The reports judged were generated from hand-written recordings (D25 item 1). The owner saw the readability pass after the orchestrator had verified it (checks green, summaries read), without a separate reviewer round.
+- **Reason:** Human gate G2 (docs/ORCHESTRATION.md §4).
+- **Affects:** Wave 4 (WP-10) may start. WP-10 must drop `status: "rejected"` rules and never export a `0.0.0-draft` Rule Set (D25 item 5). Items held for G4 are listed in D19, D25 and the G2 summary.
