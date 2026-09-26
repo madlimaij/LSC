@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { computeConfidence } from '../../src/runner/index.js';
+import type { Rule } from '../../src/contract/index.js';
+import type { Example } from '../../src/examples/index.js';
+import { computeConfidence, runRuleAgainstExamples } from '../../src/runner/index.js';
 
 describe('computeConfidence (docs/PLAN.md §6.3, D8)', () => {
   it('high: at least 5 positive and 2 negative examples, 100% pass', () => {
@@ -64,10 +66,10 @@ describe('computeConfidence (docs/PLAN.md §6.3, D8)', () => {
   });
 
   describe('D19 a: cross-construct negatives never raise the "own" threshold, and any cross-construct match blocks high/medium', () => {
-    it("reviewer's case 1: 5 own positives + 0 own negatives + 21 cross-construct negatives (all passing) is not high — 0 own negatives already fails the ≥2 threshold", () => {
+    it("reviewer's case 1: 5 own positives + 0 own negatives + 21 cross-construct negatives (all passing) is medium, not high — 0 own negatives already fails the ≥2 threshold, but the ≥3-positive/90%-pass-rate medium threshold is met", () => {
       expect(
         computeConfidence({ positiveTotal: 5, positivePassed: 5, negativeTotal: 0, negativeFailed: 0, crossNegativeFailed: 0 }),
-      ).not.toBe('high');
+      ).toBe('medium');
     });
 
     it("reviewer's case 2: 3 own positives (2 passing) + 2 own negatives stays low regardless of cross-construct negatives", () => {
@@ -96,20 +98,48 @@ describe('computeConfidence (docs/PLAN.md §6.3, D8)', () => {
       expect(withCross).toBe('low');
     });
 
-    it('cross-construct negatives are never counted in the pass rate or the ≥2-negatives threshold', () => {
-      // 0 own negatives: would need negativeTotal >= 2 for high regardless of how many cross-construct
-      // negatives pass; adding 100 passing cross-construct negatives must not change the result.
-      expect(
-        computeConfidence({ positiveTotal: 5, positivePassed: 5, negativeTotal: 0, negativeFailed: 0 }),
-      ).toBe(
-        computeConfidence({
-          positiveTotal: 5,
-          positivePassed: 5,
-          negativeTotal: 0,
-          negativeFailed: 0,
-          crossNegativeFailed: 0,
-        }),
-      );
+    it('genuinely varying the number of passing (non-matching) cross-construct negatives supplied leaves the pass rate and the confidence threshold unchanged', () => {
+      // computeConfidence itself has no "how many cross-construct negatives were supplied" input
+      // (only crossNegativeFailed, the ones that matched), so this must be shown at the level that
+      // actually varies the count: runRuleAgainstExamples, fed 0, 1 and 100 passing cross-construct
+      // negative examples (of a different construct, none of which this rule's pattern matches).
+      const rule: Rule = {
+        id: 'call-statement',
+        type: 'call',
+        engine: 'regex',
+        regex: { pattern: '\\bCALL\\s+(?<callee>[A-Za-z_][A-Za-z0-9_]*)\\s*\\(', flags: 'i', multiline: false },
+        captures: { callee: 'callee' },
+        confidence: 'high',
+        sourceEvidence: [{ skill: 'skills/call.md', anchor: 'a', exampleIds: ['call-01', 'call-02', 'call-03', 'call-04', 'call-05'] }],
+        tests: { passed: 0, failed: 0, failingExampleIds: [] },
+        status: 'validated',
+      };
+      const positives: Example[] = Array.from({ length: 5 }, (_, i) => ({
+        id: `call-0${String(i + 1)}`,
+        construct: 'call',
+        polarity: 'positive',
+        code: `CALL fn_${String(i)}(x)\n`,
+        expected: [{ line: 1, type: 'call', captures: { callee: `fn_${String(i)}` } }],
+        source: { kind: 'inline', skill: 'skills/call.md', line: 1 },
+      }));
+      const passingCrossNegative = (i: number): Example => ({
+        id: `other-neg-${String(i)}`,
+        construct: 'other-construct',
+        polarity: 'negative',
+        code: `LOG "no call here ${String(i)}"\n`,
+        expected: [],
+        source: { kind: 'inline', skill: 'skills/other.md', line: 1 },
+      });
+
+      const with0 = runRuleAgainstExamples(rule, {}, positives);
+      const with1 = runRuleAgainstExamples(rule, {}, [...positives, passingCrossNegative(0)]);
+      const with100 = runRuleAgainstExamples(rule, {}, [...positives, ...Array.from({ length: 100 }, (_, i) => passingCrossNegative(i))]);
+
+      for (const result of [with0, with1, with100]) {
+        expect(result.tests).toEqual({ passed: 5, failed: 0, failingExampleIds: [] });
+        expect(result.crossNegativeFailures).toEqual([]);
+        expect(result.computedConfidence).toBe('medium');
+      }
     });
   });
 });

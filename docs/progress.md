@@ -261,3 +261,20 @@ Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 **Deviations:** The unnamed definition is still pushed on its rule's `blockEnd` stack, so its own `blockEnd` closes itself, not the outer scope. **This differs from CONTRACT.md §6.6/§9 Q9 b** (1.0.1), which says an unnamed definition's `blockEnd` closes the most recent open scope of the same rule (ending an outer same-rule scope early) and explicitly did not adopt the "anonymous scope" alternative. Raised with the project owner.
 
 **Open questions:** §9 Q2 and Q9 a remain for G4.
+
+### Wave 2 review round 3 fixes: WP-04, WP-05, WP-06 (`engine-builder`, `skill-ingester`, 2026-09-26)
+
+*(Appended by the orchestrator from the agents' final messages. The owner authorised this round in D23.)*
+
+**What changed:** `src/engines/blocks.ts` (header and inline comments now describe 1.0.2 §6.6, with no behaviour change), `src/engines/mapping.ts` (fallback module must start strictly before the match; empty optional `module`/`kind` captures left out), `tests/engines/{blocks,mapping}.test.ts`, `tests/runner/index.test.ts` (new), `tests/runner/{test-cmd,rule-run,confidence}.test.ts`, `tests/ingest/ingest.test.ts`.
+
+**Round-2 findings**
+- WP-04 #1 comments and tests vs 1.0.2: **fixed**. Citations corrected, and tests added for the unnamed PROC+END (no warning) and unnamed PROC without END (unclosed-block) cases; case (a) was already covered.
+- WP-04 #2 strictly earlier fallback position: **fixed**. The "withModule" test now uses distinct positions, and a new same-position test expects the file path.
+- WP-04 #3 empty optional captures: **fixed**, with 2 new tests in `mapping.test.ts`.
+- WP-05 #1 cross-construct negative fails the run: **fixed**. New `tests/runner/index.test.ts` (`ok === false`, and `true` without the negative). `test-cmd.test.ts` checks exit 1, `FAIL  call-statement`, "cross-construct negative matched: flag-neg-01" and `FAILED:`. Removing the check in `src/runner/index.ts` makes both tests fail (verified by the agent).
+- WP-05 #2 weak assertions: **fixed**. Exact `'medium'` values; the identical-input test is replaced with one that feeds 0, 1 and 100 passing cross-construct negatives to `runRuleAgainstExamples`.
+- WP-06 #1 nested example lines: **fixed**, exact fence lines 23 and 31.
+- Checks: `npm run typecheck` and `npm run lint` clean; `npm test` 46 files, 479 tests (orchestrator re-ran).
+
+**Deviations:** None. The CLI's per-rule PASS/FAIL label duplicates the runner's `ok` logic. It is covered by the `FAIL  call-statement` assertion, but removing only the CLI copy was not tested separately.

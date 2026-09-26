@@ -102,7 +102,9 @@ describe('runRuleAgainstExamples', () => {
     const result = runRuleAgainstExamples(rule, {}, [...positives, ...crossNegatives]);
     expect(result.tests).toEqual({ passed: 5, failed: 0, failingExampleIds: [] });
     expect(result.crossNegativeFailures).toEqual([]);
-    expect(result.computedConfidence).not.toBe('high');
+    // 5 of 5 own positives pass, 0 own negatives: fails the "high" threshold (needs >=2 own
+    // negatives), but qualifies for "medium" (>=3 positives, 100% pass rate, no failing negative).
+    expect(result.computedConfidence).toBe('medium');
   });
 
   it("reviewer's case 2: 3 own positives (2 passing) + 2 own negatives stays low regardless of cross-construct negatives (D19 a)", () => {

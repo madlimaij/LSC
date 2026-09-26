@@ -1,18 +1,18 @@
 /**
  * Block tracking (D4, contract/CONTRACT.md §6.6): definition rules with
  * `blockEnd` open and close scopes; every match gets `enclosingSymbol` =
- * innermost still-open scope (any rule) at its start position.
+ * innermost still-open *named* scope (any rule) at its start position.
  *
- * D19 c / D20 (contract/CONTRACT.md §6.6): an **unnamed** definition (its
- * `name` capture missing or empty) opens no scope, even when its rule has
- * `blockEnd` — matches after it keep whatever scope was innermost before it.
- * Its `blockEnd` match, if any, is still processed like any other `blockEnd`
- * of that rule (closes the most recently opened, still-open scope of the
- * same rule; ignored with a warning if none is open) — so with nested
- * same-rule definitions, an unnamed inner definition's end can close the
- * outer scope early. This is the contract's adopted behaviour (§9 Q9 b), not
- * a bug: the alternative (a transparent anonymous scope) would contradict
- * "opens no scope".
+ * 1.0.2 (contract/CONTRACT.md §6.6, D21, D22): an **unnamed** definition (its
+ * `name` capture missing or empty) of a rule with `blockEnd` still opens a
+ * scope for same-rule `blockEnd` pairing: its own `blockEnd` closes it (LIFO
+ * per rule), and a `blockEnd` never skips it to close an older scope of the
+ * same rule. But that scope is anonymous — it is never exposed via
+ * `enclosingSymbol` and never a fallback source (§4.1 items 2 and 4): a
+ * match inside it gets the innermost *named* scope open at its start
+ * position instead. This replaces the withdrawn 1.0.1 text, under which an
+ * unnamed definition opened no scope at all, so its own `blockEnd` could
+ * close an outer, named scope early and misattribute the matches after it.
  */
 import type { Rule } from '../contract/index.js';
 import { matchBlockEnd, matchRule } from './match-rule.js';
@@ -99,9 +99,10 @@ export function scanFile(rules: readonly Rule[], file: PreparedFile): ScanResult
 
     if (rule.blockEnd !== undefined && (rule.type === 'module_declaration' || rule.type === 'symbol_definition')) {
       const rawName = match.captures.name;
-      // A missing or empty `name` capture (contract/CONTRACT.md §6.5) is an unnamed definition (D19 c):
-      // its scope is tracked for blockEnd pairing (perRuleStack) but never exposed as an enclosing
-      // symbol (openScopes), and matches after it keep the previously innermost scope.
+      // A missing or empty `name` capture (contract/CONTRACT.md §6.5) is an unnamed definition
+      // (§6.6, D21, D22): its scope is tracked for blockEnd pairing (perRuleStack) but never
+      // exposed as an enclosing symbol (openScopes), and matches after it keep the previously
+      // innermost named scope.
       const name = rawName !== undefined && rawName !== '' ? rawName : undefined;
       const scope: Scope = { ruleId: rule.id, name, line: match.line, column: match.column };
       const stack = perRuleStack.get(rule.id);

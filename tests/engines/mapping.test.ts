@@ -195,13 +195,13 @@ describe('Match → Navigator mapping (contract/CONTRACT.md §4)', () => {
 
     const withModule = mapMatches(
       [
-        match({ ruleId: 'module-declaration', type: 'module_declaration', captures: { name: 'billing' } }),
-        match({ captures: { callee: 'x' } }),
+        match({ ruleId: 'module-declaration', type: 'module_declaration', line: 1, column: 1, captures: { name: 'billing' } }),
+        match({ line: 2, column: 1, captures: { callee: 'x' } }),
       ],
       [moduleRule, callRule()],
       'billing.tl',
     );
-    expect(withModule.relations).toEqual([{ kind: 'calls', source: 'billing', callee: 'x', line: 1, ruleId: 'call-statement' }]);
+    expect(withModule.relations).toEqual([{ kind: 'calls', source: 'billing', callee: 'x', line: 2, ruleId: 'call-statement' }]);
     expect(withModule.uncertainties).toEqual([]);
 
     const withoutModule = mapMatches([match({ captures: { callee: 'x' } })], [callRule()], 'orphan/file.tl');
@@ -221,6 +221,59 @@ describe('Match → Navigator mapping (contract/CONTRACT.md §4)', () => {
     );
     const callRelation = unnamedModule.relations.find((r) => r.kind === 'calls');
     expect(callRelation).toMatchObject({ source: 'orphan2.tl' });
+  });
+
+  it('a module_declaration at the same (line, column) as the match it would otherwise source is not "before" it, so the file is the fallback source (§4.1 item 4)', () => {
+    const moduleRule: Rule = {
+      id: 'module-declaration',
+      type: 'module_declaration',
+      engine: 'exact',
+      exact: { tokens: ['MODULE', '(?<name>)'], caseSensitive: false },
+      captures: { name: 'name' },
+      confidence: 'high',
+      ...identity,
+    };
+
+    const samePosition = mapMatches(
+      [
+        match({ ruleId: 'module-declaration', type: 'module_declaration', line: 3, column: 5, captures: { name: 'billing' } }),
+        match({ line: 3, column: 5, captures: { callee: 'x' } }),
+      ],
+      [moduleRule, callRule()],
+      'same-position.tl',
+    );
+    expect(samePosition.relations).toEqual([
+      { kind: 'calls', source: 'same-position.tl', callee: 'x', line: 3, ruleId: 'call-statement' },
+    ]);
+  });
+
+  it('an empty optional "module" capture on a call is left out of the record, same as absent (§4.1 item 2, §6.5)', () => {
+    const analysis = mapMatches(
+      [match({ captures: { callee: 'x', module: '' }, enclosingSymbol: 's' })],
+      [callRule()],
+      'f.tl',
+    );
+    expect(analysis.relations).toEqual([{ kind: 'calls', source: 's', callee: 'x', line: 1, ruleId: 'call-statement' }]);
+    expect('module' in (analysis.relations[0] ?? {})).toBe(false);
+  });
+
+  it('an empty optional "kind" capture on an entry_point is left out of the record, same as absent (§4.1 item 2, §6.5)', () => {
+    const entryRule: Rule = {
+      id: 'entry-point',
+      type: 'entry_point',
+      engine: 'exact',
+      exact: { tokens: ['ENTRY', '(?<name>)'], caseSensitive: false },
+      captures: { name: 'name', kind: 'kind' },
+      confidence: 'high',
+      ...identity,
+    };
+    const analysis = mapMatches(
+      [match({ ruleId: 'entry-point', type: 'entry_point', captures: { name: 'run', kind: '' } })],
+      [entryRule],
+      'f.tl',
+    );
+    expect(analysis.entryPoints).toEqual([{ name: 'run', line: 1, ruleId: 'entry-point' }]);
+    expect('kind' in (analysis.entryPoints[0] ?? {})).toBe(false);
   });
 
   it('a match for a rule not passed in is skipped defensively', () => {

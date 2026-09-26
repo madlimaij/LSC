@@ -113,7 +113,7 @@ describe('block tracking (D4, contract/CONTRACT.md §6.6)', () => {
     expect(call?.enclosingSymbol).toBeUndefined();
   });
 
-  it('an unnamed definition (missing name capture) opens no scope; matches inside keep the outer scope (D19 c)', () => {
+  it('an unnamed definition (missing name capture) opens an anonymous scope; matches inside keep the outer named scope (contract §6.6, 1.0.2)', () => {
     const procOptionalName: RegexRule = {
       ...procRule,
       id: 'proc-optional-name',
@@ -129,7 +129,7 @@ describe('block tracking (D4, contract/CONTRACT.md §6.6)', () => {
     expect(call?.enclosingSymbol).toBe('outer');
   });
 
-  it('an unnamed definition with an empty (not just absent) name capture also opens no scope (D19 c, contract §6.5)', () => {
+  it('an unnamed definition with an empty (not just absent) name capture also opens an anonymous scope, not a named one (contract §6.5, §6.6, 1.0.2)', () => {
     const procEmptyName: RegexRule = {
       ...procRule,
       id: 'proc-empty-name',
@@ -142,7 +142,7 @@ describe('block tracking (D4, contract/CONTRACT.md §6.6)', () => {
     expect(call?.enclosingSymbol).toBe('outer');
   });
 
-  it("an unnamed definition still consumes its own blockEnd via the same-rule LIFO stack (contract §6.6, §9 Q9 b), leaving the outer scope open", () => {
+  it('an unnamed definition still consumes its own blockEnd via the same-rule LIFO stack (contract §6.6, 1.0.2, D21, D22), leaving the outer named scope open', () => {
     const procOptionalName: RegexRule = {
       ...procRule,
       id: 'proc-optional-name',
@@ -155,6 +155,33 @@ describe('block tracking (D4, contract/CONTRACT.md §6.6)', () => {
     expect(warnings).toEqual([]);
     const call = matches.find((m) => m.type === 'call');
     expect(call?.enclosingSymbol).toBe('outer');
+  });
+
+  it('an unnamed definition closed by its own blockEnd with nothing else open produces no warning (contract §6.6, 1.0.2)', () => {
+    const procOptionalName: RegexRule = {
+      ...procRule,
+      id: 'proc-optional-name',
+      regex: { pattern: '^\\s*PROC(?:\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*))?', flags: 'i', multiline: false },
+    };
+    const { matches, warnings } = scan([procOptionalName], 'PROC\nENDPROC');
+    expect(warnings).toEqual([]);
+    const def = matches.find((m) => m.type === 'symbol_definition');
+    expect(def?.captures.name).toBeUndefined();
+    expect(def?.enclosingSymbol).toBeUndefined();
+  });
+
+  it('an unnamed definition with no blockEnd match is an unclosed-block warning, like any other open scope (contract §6.6, 1.0.2)', () => {
+    const procOptionalName: RegexRule = {
+      ...procRule,
+      id: 'proc-optional-name',
+      regex: { pattern: '^\\s*PROC(?:\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*))?', flags: 'i', multiline: false },
+    };
+    const { matches, warnings } = scan([procOptionalName], 'PROC');
+    const def = matches.find((m) => m.type === 'symbol_definition');
+    expect(def?.captures.name).toBeUndefined();
+    expect(warnings).toEqual([
+      expect.objectContaining({ kind: 'unclosed-block', ruleId: 'proc-optional-name', line: 1 }),
+    ]);
   });
 
   it('closing an outer scope while an inner (different-rule) scope is still open only closes the outer one', () => {

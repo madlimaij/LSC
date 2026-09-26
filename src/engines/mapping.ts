@@ -135,8 +135,12 @@ export function mapMatches(matches: readonly Match[], rules: readonly Rule[], fi
   const ruleById = new Map(rules.map((rule) => [rule.id, rule] as const));
   const out = emptyAnalysis();
   // Last *named* module_declaration match seen so far, in file order (§4.1 item 4, §6.6):
-  // used regardless of that rule's blockEnd or whether its scope is still open.
-  let lastModuleName: string | undefined;
+  // used regardless of that rule's blockEnd or whether its scope is still open. Tracked with its
+  // own start position so a later match only takes it as fallback source when the module
+  // declaration's start position is strictly earlier (§4.1 item 4 "before the match's start
+  // position"): a module_declaration at the same (line, column) as the match it would otherwise
+  // source is not "before" it.
+  let lastModule: { readonly name: string; readonly line: number; readonly column: number } | undefined;
 
   for (const match of matches) {
     const rule = ruleById.get(match.ruleId);
@@ -166,9 +170,15 @@ export function mapMatches(matches: readonly Match[], rules: readonly Rule[], fi
       continue;
     }
 
-    if (match.type === 'module_declaration') lastModuleName = match.captures.name;
+    // A blank name would already have been caught by `missingRequired` above (§4.1 item 2), so
+    // `captures.name` is always present and non-empty here.
+    if (match.type === 'module_declaration') {
+      lastModule = { name: required(match.captures.name, 'name'), line: match.line, column: match.column };
+    }
 
-    const source = RECORDS_NEEDING_SOURCE.has(spec.navigatorRecord) ? (match.enclosingSymbol ?? lastModuleName ?? file) : undefined;
+    const isBeforeMatch = lastModule !== undefined && (lastModule.line < match.line || (lastModule.line === match.line && lastModule.column < match.column));
+    const fallbackModuleName = isBeforeMatch ? lastModule?.name : undefined;
+    const source = RECORDS_NEEDING_SOURCE.has(spec.navigatorRecord) ? (match.enclosingSymbol ?? fallbackModuleName ?? file) : undefined;
     pushRecord(out, match, source);
   }
 
@@ -211,7 +221,7 @@ function pushRecord(out: NavigatorAnalysis, match: Match, source: string | undef
         kind: 'calls',
         source: required(source, 'source'),
         callee: required(captures.callee, 'callee'),
-        ...(captures.module !== undefined ? { module: captures.module } : {}),
+        ...(!isBlank(captures.module) ? { module: captures.module } : {}),
         line,
         ruleId,
       });
@@ -254,7 +264,7 @@ function pushRecord(out: NavigatorAnalysis, match: Match, source: string | undef
     case 'entry_point':
       out.entryPoints.push({
         name: required(captures.name, 'name'),
-        ...(captures.kind !== undefined ? { kind: captures.kind } : {}),
+        ...(!isBlank(captures.kind) ? { kind: captures.kind } : {}),
         line,
         ruleId,
       });
