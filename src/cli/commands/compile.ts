@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Command } from 'commander';
 import { formatIssue, type RuleSet } from '../../contract/index.js';
@@ -7,6 +7,7 @@ import { exampleLocations } from '../../examples/index.js';
 import { createSession, LlmConfigError, loadConfig, loadRecordings, type LlmConfig } from '../../llm/index.js';
 import type { IngestResult } from '../../ingest/index.js';
 import {
+  checkExportTarget,
   ExportError,
   exportFiles,
   isReleaseVersion,
@@ -134,16 +135,15 @@ function reuseFrom(previous: RuleSet, force: boolean): (ingest: IngestResult) =>
   };
 }
 
-/** `--export` refusals that can be known before any model call (the rest are `exportFiles`' own, D31). */
-function checkExportTarget(options: Options, outputs: string[]): void {
+/**
+ * `--export` refusals that can be known before any model call. Own check: the target must not be one of compile's
+ * outputs. The rest is src/release `checkExportTarget` (an existing target needs --previous, and a stale --previous is
+ * refused, D31), which `exportFiles` repeats when it writes.
+ */
+function checkCompileOutputs(options: Options, outputs: string[]): void {
   if (options.export === undefined) return;
   const target = resolve(options.export);
   if (outputs.some((o) => resolve(o) === target)) throw new UsageError(`--export must not be one of the files lsc compile writes (${options.export})`);
-  if (options.previous === undefined && existsSync(target)) {
-    throw new UsageError(
-      `--export: ${options.export} already exists; pass --previous <file> (normally that same file) so the new version is derived from it, or remove it to start again at 1.0.0`,
-    );
-  }
 }
 
 function parseAttempts(value: string | undefined, fallback: number): number {
@@ -253,8 +253,9 @@ export function configure(cmd: Command): void {
 
         if (options.force === true && options.previous === undefined) throw new UsageError('--force only has a meaning with --previous');
         const draftFile = `${languageId}.ruleset.draft.json`;
-        checkExportTarget(options, [draftFile, 'results.json', 'synthesis.json', 'report.md', 'report.html'].map((f) => join(options.out, f)));
+        checkCompileOutputs(options, [draftFile, 'results.json', 'synthesis.json', 'report.md', 'report.html'].map((f) => join(options.out, f)));
         const previous = options.previous !== undefined ? loadPrevious(options.previous, languageId) : undefined;
+        if (options.export !== undefined) checkExportTarget(options.export, options.previous);
 
         const locations = exampleLocations(skillsDir);
         assertRecordingAllowed({

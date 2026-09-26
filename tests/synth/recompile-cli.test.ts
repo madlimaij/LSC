@@ -29,6 +29,8 @@ interface Run {
   readonly asked: string[];
   readonly stdout: string;
   readonly stderr: string;
+  /** Snippet log directory of this run (created only when a model session is opened). */
+  readonly logDir: string;
 }
 
 async function compile(skillsDir: string, recordings: string, ...extra: string[]): Promise<Run> {
@@ -47,6 +49,7 @@ async function compile(skillsDir: string, recordings: string, ...extra: string[]
       .map((e) => targetOf(e.request).target),
     stdout: io.out.join(''),
     stderr: io.err.join(''),
+    logDir,
   };
 }
 
@@ -189,6 +192,32 @@ describe('lsc compile --previous --export (WP-10 recompile)', () => {
     expect(overwrite.stderr).toMatch(/already exists; pass --previous/);
     expect(overwrite.asked).toEqual([]);
     expect(readFileSync(existing, 'utf8')).toBe('{}');
+  });
+
+  it('refuses a stale --previous before any model call: --export holds 2.1.0, --previous is 1.0.0', async () => {
+    const { skillsDir } = copyToylang();
+    const release = join(tempDir(), 'release', 'toylang.ruleset.json');
+    const changelog = join(release, '..', 'CHANGELOG.md');
+    expect((await compile(skillsDir, recordingsDir('wp09'), '--export', release)).code).toBe(0);
+    // Keep 1.0.0 as the stale --previous, then stand in for later exports up to 2.1.0 at the export target.
+    const stale = join(tempDir(), 'toylang-1.0.0.ruleset.json');
+    writeFileSync(stale, readFileSync(release, 'utf8'));
+    writeFileSync(release, `${JSON.stringify({ ...readRuleSet(release), version: '2.1.0' }, null, 2)}\n`);
+    const before = readFileSync(release, 'utf8');
+    const changelogBefore = readFileSync(changelog, 'utf8');
+
+    editDbWriteSkill(skillsDir);
+    const recordings = await recordingsFor(skillsDir, { 'db-write': [DB_WRITE_REGEX] });
+    const run = await compile(skillsDir, recordings, '--previous', stale, '--export', release);
+    expect(run.code).toBe(1);
+    expect(run.stderr).toContain('--export: ');
+    expect(run.stderr).toContain('holds toylang 2.1.0, but --previous');
+    expect(run.stderr).toContain('is toylang 1.0.0');
+    expect(run.asked).toEqual([]);
+    expect(existsSync(run.logDir)).toBe(false);
+    expect(existsSync(join(run.out, 'synthesis.json'))).toBe(false);
+    expect(readFileSync(release, 'utf8')).toBe(before);
+    expect(readFileSync(changelog, 'utf8')).toBe(changelogBefore);
   });
 
   it('--export after a compile with a rejected construct drops it, as lsc export does', async () => {
