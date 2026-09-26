@@ -9,7 +9,7 @@
 | WP-04 | Rule engines | engine-builder | WP-02, WP-03 | done (reviewed wave 2, round 3; last fix verified by orchestrator) |
 | WP-05 | Test runner | engine-builder | WP-04 | done (reviewed wave 2, round 3) |
 | WP-06 | Skill ingestion | skill-ingester | WP-03 | done (reviewed wave 2, round 3) |
-| WP-07 | Report + review CLI | report-builder | WP-05 | in progress |
+| WP-07 | Report + review CLI | report-builder | WP-05 | done (awaiting wave 3 review) |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | done except real-provider run (awaiting wave 3 review) |
 | WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | not started |
@@ -321,3 +321,30 @@ Gates: G1 ☑ G2 ☐ G3 ☐ G4 ☐
 - G4: lexical settings from config if a language has no general Skill file.
 - A real-provider recording run on toylang to replace the hand-written answers.
 - Proposed DECISIONS entry recorded as D24.
+
+### WP-07: Validation report and review CLI (`report-builder`, 2026-09-26)
+
+*(Appended by the orchestrator from the agent's final message; parallel wave.)*
+
+**What was built:**
+- `src/report/`: `model.ts`, `build.ts` (`buildReport`), `confidence-reason.ts`, `rule-status.ts`, `pattern.ts`, `example-location.ts`, `review-session.ts` (review logic with no terminal I/O), `load-results.ts`, `markdown.ts`, `html.ts` (one offline file with inline CSS), `index.ts`, `README.md`.
+- `src/cli/commands/report.ts`: `lsc report <results.json> [--format md|html|json] [--ruleset] [--skills-dir] [--out]`; exits 1 when the verdict is `rejected`.
+- `src/cli/commands/review.ts`: `lsc review <results.json> [--skills-dir | --reviews-file]`. It writes `reviews.yaml` after every verdict and refuses a file that already has invalid entries.
+- `tests/report/`: 7 test files and helpers.
+
+**Acceptance criteria**
+- The toylang report shows every section, and the Markdown is snapshot-tested: **met** (`markdown.test.ts`, `html.test.ts`).
+- A broken Rule Set shows each defect in the per-rule section: **met** (`build.test.ts`, `markdown.test.ts`, reusing the three breakages from `tests/runner/broken-ruleset.test.ts`).
+- Review verdicts load back through the WP-03 loader as valid examples: **met** (`review-session.test.ts`; `cli-review.test.ts` end to end, including a second session that appends).
+- Confidence is never shown without its reason: **met** (`confidenceReason` is a required field; both renderers assert it).
+- typecheck, lint, test: **met** repo-wide (orchestrator re-ran: 59 files, 575 tests). This also completes the repo-wide checks for WP-09.
+
+**Deviations:**
+1. `lsc report` takes `--ruleset` and `--skills-dir`, because Results has no pattern, captures, provenance or source text. Without them the report says what is unavailable.
+2. `lsc review` needs `--skills-dir` or `--reviews-file` to find `reviews.yaml` (D15).
+3. Snippets for misses and false positives need `--skills-dir`. Rule id, example id, line and captures are always shown.
+4. Representative matches for passed examples are filled in only with `--skills-dir`.
+
+**Open questions:**
+- Should the `--format json` report shape ever become a stable contract?
+- Review has no prompt for editing captures.

@@ -1,0 +1,2055 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderMarkdown > matches the snapshot for the healthy toylang fixture, with samples, ruleset and skills-dir 1`] = `
+"# Rule Set report — toylang 1.0.0
+
+## Verdict
+
+**VALIDATED — 100% of own examples pass (74/74); all 8 validated rule(s) pass every own example at high or medium confidence**
+
+- Rule Set: \`toylang\` version \`1.0.0\` (compiled with lsc \`0.1.0\`, generated 2026-09-26T00:00:00.000Z)
+- Validated rules (high/medium confidence, own tests pass): 8
+- Low-confidence rules: 0
+- Rejected/broken rules: 0
+- Example pass rate (own examples): 100% (74/74)
+- Every construct with examples has a usable rule
+
+## Coverage
+
+| Rule type | Status | Confidence | Rule(s) |
+| --- | --- | --- | --- |
+| module_declaration | validated | high | module-declaration |
+| symbol_definition | validated | high | proc-definition |
+| call | validated | high | call-statement |
+| include | validated | high | include-directive |
+| db_read | validated | high | db-read |
+| db_write | validated | high | db-write |
+| config_ref | validated | high | config-flag |
+| entry_point | validated | high | entry-point |
+
+## Rules
+
+### \`module-declaration\` (module_declaration) — OK
+
+- Pattern: \`exact: MODULE <token> (case-insensitive)\`
+- Captures: name → name
+- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Pass rate (own examples): 100% (9/9)
+
+**Representative matches** (passed positive examples):
+
+- \`module-01\` (module-declaration): name="billing"
+  location: module.md:16 (example module-01)
+  \`\`\`
+   1 > MODULE billing
+  \`\`\`
+
+- \`module-02\` (module-declaration): name="invoice_utils"
+  location: module.md:28 (example module-02)
+  \`\`\`
+   1   -- Billing helpers, owned by the finance team
+   2 > module invoice_utils
+  \`\`\`
+
+- \`module-03\` (module-declaration): name="billing_v2"
+  location: module.md:41 (example module-03)
+  \`\`\`
+   1   /* MODULE legacy_billing was split in 2019:
+   2      see MODULE billing_v2 below */
+   3 > MODULE billing_v2
+   4   INCLUDE "common.tl"
+  \`\`\`
+
+- \`module-04\` (module-declaration): name="orders"
+  location: module-declaration/module-04.tl (example module-04)
+  \`\`\`
+   1 > MODULE orders
+   2   INCLUDE "common.tl"
+   3   
+  \`\`\`
+
+- \`module-05\` (module-declaration): name="reporting"
+  location: module-declaration/module-05.tl (example module-05)
+  \`\`\`
+   1 > 	MODULE	  reporting   -- nightly reports
+  \`\`\`
+
+- \`module-06\` (module-declaration): name="customers"
+  location: module-declaration/module-06.tl (example module-06)
+  \`\`\`
+   1   -- file: customers.tl
+   2 > MODULE customers
+   3   LET banner = "MODULE customers loaded"
+  \`\`\`
+
+
+**Missed examples** (expected but not found):
+
+_None._
+
+**Wrong captures** (matched the right line, wrong values):
+
+_None._
+
+**False positives** (matched a negative example):
+
+_None._
+
+
+**Unreviewed sample matches** (20, run \`lsc review\` to label them):
+
+- \`admin/audit.tl:1\`: name="audit"
+  \`\`\`
+   1 > MODULE audit
+   2   INCLUDE "legacy--compat.tl"
+   3   
+   4   PROC record(event)
+  \`\`\`
+
+- \`admin/flags.tl:1\`: name="flags"
+  \`\`\`
+   1 > MODULE flags
+   2   -- Flag overview for operations. Note: "don't remove flags here
+   3   INCLUDE "common.tl"
+   4   
+  \`\`\`
+
+- \`batch/nightly.tl:1\`: name="nightly"
+  \`\`\`
+   1 > MODULE nightly
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC run_all()
+  \`\`\`
+
+- \`batch/retry.tl:1\`: name="retry"
+  \`\`\`
+   1 > MODULE retry
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC retry_failed()
+  \`\`\`
+
+- \`billing/billing.tl:1\`: name="billing"
+  \`\`\`
+   1 > MODULE billing
+   2   INCLUDE "common.tl"
+   3   INCLUDE "billing/rates.tl"
+   4   -- Nightly invoice run. Owner: finance batch team.
+  \`\`\`
+
+- \`billing/invoices.tl:1\`: name="invoices"
+  \`\`\`
+   1 > MODULE invoices
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC close_invoice(inv_id)
+  \`\`\`
+
+- \`billing/rates.tl:1\`: name="rates"
+  \`\`\`
+   1 > MODULE rates
+   2   INCLUDE "common.tl"
+   3   
+   4   FUNC net_price(amount) RETURNS NUMBER
+  \`\`\`
+
+- \`common/common.tl:1\`: name="common"
+  \`\`\`
+   1 > MODULE common
+   2   -- Shared helpers. Keep this module free of database access.
+   3   
+   4   PROC log_event(msg)
+  \`\`\`
+
+- \`common/dates.tl:1\`: name="dates"
+  \`\`\`
+   1 > MODULE dates
+   2   
+   3   FUNC month_start(d) RETURNS DATE
+   4     -- "PROC" and "FUNC" in the messages below are plain text
+  \`\`\`
+
+- \`customers/customers.tl:1\`: name="customers"
+  \`\`\`
+   1 > MODULE customers
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC load_customer(cid)
+  \`\`\`
+
+- \`customers/messages.tl:1\`: name="messages"
+  \`\`\`
+   1 > MODULE messages
+   2   
+   3   PROC unread_count(uid)
+   4     READ inbox WHERE owner = uid AND NOT read
+  \`\`\`
+
+- \`inventory/stock.tl:1\`: name="stock"
+  \`\`\`
+   1 > MODULE stock
+   2   INCLUDE "inventory/warehouse.tl"
+   3   
+   4   PROC refresh_stock()
+  \`\`\`
+
+- \`inventory/warehouse.tl:1\`: name="warehouse"
+  \`\`\`
+   1 > MODULE warehouse
+   2   
+   3   PROC reorder(product_id)
+   4     LOG "/*"; CALL sync_warehouse(product_id)
+  \`\`\`
+
+- \`legacy/dos_export.tl:1\`: name="dos_export"
+  \`\`\`
+   1 > MODULE dos_export
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC export_orders()
+  \`\`\`
+
+- \`legacy/old_billing.tl:1\`: name="old_billing"
+  \`\`\`
+   1 > MODULE old_billing
+   2   /*
+   3     Retired 2019. Kept for reference only.
+   4   
+  \`\`\`
+
+- \`orders/dispatch.tl:1\`: name="dispatch"
+  \`\`\`
+   1 > MODULE dispatch
+   2   -- Dispatches an order to the handler configured for its channel.
+   3   
+   4   PROC dispatch(order_id, channel)
+  \`\`\`
+
+- \`orders/order_lines.tl:1\`: name="order_lines"
+  \`\`\`
+   1 > MODULE order_lines
+   2   
+   3   PROC load_lines(oid)
+   4     READ &
+  \`\`\`
+
+- \`orders/orders.tl:1\`: name="orders"
+  \`\`\`
+   1 > MODULE orders
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC load_order(order_id)
+  \`\`\`
+
+- \`reporting/month_end.tl:1\`: name="month_end"
+  \`\`\`
+   1 > module month_end
+   2   include "common.tl"
+   3   
+   4   proc close_month()
+  \`\`\`
+
+- \`reporting/reports.tl:1\`: name="reports"
+  \`\`\`
+   1 > MODULE reports
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC build_report()
+  \`\`\`
+
+
+**Provenance**
+
+- \`skills/module.md\` § declaring-a-module — examples: module-01, module-02, module-03, module-04, module-05, module-06, module-neg-01, module-neg-02, module-neg-03
+
+### \`proc-definition\` (symbol_definition) — OK
+
+- Pattern: \`regex: /^\\s*(?<kind>PROC|FUNC)\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)/i (per line)\`
+- Captures: kind → kind, name → name
+- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Pass rate (own examples): 100% (9/9)
+
+**Representative matches** (passed positive examples):
+
+- \`proc-01\` (proc-definition): name="calc_total", kind="PROC"
+  location: procedure.md:19 (example proc-01)
+  \`\`\`
+   1 > PROC calc_total(order_id)
+   2     READ orders WHERE id = order_id
+   3     RETURN
+  \`\`\`
+
+- \`proc-02\` (proc-definition): name="net_price", kind="FUNC"
+  location: procedure.md:34 (example proc-02)
+  \`\`\`
+   1 > FUNC net_price(amount) RETURNS NUMBER
+   2     RETURN amount * 0.8
+   3   ENDFUNC
+  \`\`\`
+
+- \`proc-03\` (proc-definition): name="apply_discount", kind="proc"
+  location: procedure.md:48 (example proc-03)
+  \`\`\`
+   1 > proc apply_discount(order_id)
+   2     IF discount_allowed THEN
+   3       IF order_total > 100 THEN
+  \`\`\`
+
+- \`proc-04\` (proc-definition): name="calc_total_v2", kind="PROC"
+  location: proc-definition/proc-04.tl (example proc-04)
+  \`\`\`
+   1   -- PROC old_total(order_id) was replaced by calc_total_v2
+   2 > PROC calc_total_v2(order_id, region)
+   3     LOG "PROC calc_total_v2 started"
+   4   ENDPROC
+  \`\`\`
+
+- \`proc-05\` (proc-definition): name="refresh_stock", kind="PROC"
+  location: proc-definition/proc-05.tl (example proc-05)
+  \`\`\`
+   1   MODULE stock
+   2   
+   3 > 	PROC   refresh_stock ()
+   4   	  CALL sync_warehouse()
+   5   	ENDPROC
+  \`\`\`
+
+- \`proc-06\` (proc-definition): name="shipping_cost", kind="func"
+  location: proc-definition/proc-06.tl (example proc-06)
+  \`\`\`
+   1 > func shipping_cost(weight, &
+   2                      zone) RETURNS NUMBER
+   3     RETURN weight * 2
+  \`\`\`
+
+
+**Missed examples** (expected but not found):
+
+_None._
+
+**Wrong captures** (matched the right line, wrong values):
+
+_None._
+
+**False positives** (matched a negative example):
+
+_None._
+
+
+**Unreviewed sample matches** (35, run \`lsc review\` to label them):
+
+- \`admin/audit.tl:4\`: name="record", kind="PROC"
+  \`\`\`
+   1   MODULE audit
+   2   INCLUDE "legacy--compat.tl"
+   3   
+   4 > PROC record(event)
+   5     LET RECALL_count = RECALL_count + 1
+   6     LET PROCESSOR = "audit"
+   7     WRITE audit_log SET event = event, read = 0, write = 1
+  \`\`\`
+
+- \`admin/audit.tl:11\`: name="RECALL_orders", kind="PROC"
+  \`\`\`
+   8     CALL RECALL_orders(event)
+   9   ENDPROC
+  10   
+  11 > PROC RECALL_orders(event)
+  12     RETURN
+  13   ENDPROC
+  14   
+  \`\`\`
+
+- \`admin/flags.tl:5\`: name="check_flags", kind="PROC"
+  \`\`\`
+   2   -- Flag overview for operations. Note: "don't remove flags here
+   3   INCLUDE "common.tl"
+   4   
+   5 > PROC check_flags(flag_name)
+   6     LET enabled = FLAG(flag_name)
+   7     LET legacy = FLAG("legacy--mode")
+   8     IF FLAG("audit") THEN -- FLAG("audit_v2") not yet
+  \`\`\`
+
+- \`batch/nightly.tl:4\`: name="run_all", kind="PROC"
+  \`\`\`
+   1   MODULE nightly
+   2   INCLUDE "common.tl"
+   3   
+   4 > PROC run_all()
+   5     CALL billing.calc_total(0)
+   6     CALL &
+   7         late_bound_cleanup()
+  \`\`\`
+
+- \`batch/nightly.tl:11\`: name="late_bound_cleanup", kind="PROC"
+  \`\`\`
+   8     CALL orders.close_day()
+   9   ENDPROC
+  10   
+  11 > PROC late_bound_cleanup()
+  12     LOG "cleanup"
+  13   ENDPROC
+  14   
+  \`\`\`
+
+- \`batch/retry.tl:4\`: name="retry_failed", kind="PROC"
+  \`\`\`
+   1   MODULE retry
+   2   INCLUDE "common.tl"
+   3   
+   4 > PROC retry_failed()
+   5     READ failed_jobs WHERE attempts < 3 INTO job
+   6     IF ROWCOUNT() > 0 THEN
+   7       CALL common.log_event("retrying")
+  \`\`\`
+
+- \`billing/billing.tl:6\`: name="calc_total", kind="PROC"
+  \`\`\`
+   3   INCLUDE "billing/rates.tl"
+   4   -- Nightly invoice run. Owner: finance batch team.
+   5   
+   6 > PROC calc_total(order_id)
+   7     READ orders WHERE id = order_id INTO ord
+   8     LET t = 0
+   9     IF FLAG("new_pricing") THEN
+  \`\`\`
+
+- \`billing/billing.tl:19\`: name="apply_discount", kind="PROC"
+  \`\`\`
+  16     RETURN
+  17   ENDPROC
+  18   
+  19 > PROC apply_discount(order_id)
+  20     READ discounts WHERE order_id = order_id
+  21     IF ROWCOUNT() > 0 THEN
+  22       IF FLAG("stacked_discounts") THEN
+  \`\`\`
+
+- \`billing/billing.tl:28\`: name="legacy_total", kind="PROC"
+  \`\`\`
+  25     ENDIF
+  26   ENDPROC
+  27   
+  28 > PROC legacy_total(order_id)
+  29     -- CALL old_total(order_id) replaced in 2021
+  30     READ order_lines WHERE order_id = order_id
+  31     RETURN
+  \`\`\`
+
+- \`billing/invoices.tl:4\`: name="close_invoice", kind="PROC"
+  \`\`\`
+   1   MODULE invoices
+   2   INCLUDE "common.tl"
+   3   
+   4 > PROC close_invoice(inv_id)
+   5     READ invoices WHERE id = inv_id INTO inv
+   6     WRITE invoices &
+   7       SET status = "closed", &
+  \`\`\`
+
+- \`billing/invoices.tl:14\`: name="reopen_invoice", kind="PROC"
+  \`\`\`
+  11     CALL common.log_event("invoice closed")
+  12   ENDPROC
+  13   
+  14 > PROC reopen_invoice(inv_id)
+  15     LOG "WRITE invoices SET status = open"   -- message only
+  16     WRITE invoices SET status = "open" WHERE id = inv_id
+  17   ENDPROC
+  \`\`\`
+
+- \`billing/rates.tl:4\`: name="net_price", kind="FUNC"
+  \`\`\`
+   1   MODULE rates
+   2   INCLUDE "common.tl"
+   3   
+   4 > FUNC net_price(amount) RETURNS NUMBER
+   5     LET vat = 0.2
+   6     IF FLAG("eu_vat") AND FLAG("vat.v2") THEN
+   7       READ vat_rates WHERE region = current_region INTO vat
+  \`\`\`
+
+- \`billing/rates.tl:12\`: name="round_price", kind="FUNC"
+  \`\`\`
+   9     RETURN amount * (1 + vat)
+  10   ENDFUNC
+  11   
+  12 > FUNC round_price(amount) RETURNS NUMBER
+  13     RETURN amount
+  14   ENDFUNC
+  15   
+  \`\`\`
+
+- \`common/common.tl:4\`: name="log_event", kind="PROC"
+  \`\`\`
+   1   MODULE common
+   2   -- Shared helpers. Keep this module free of database access.
+   3   
+   4 > PROC log_event(msg)
+   5     LOG NOW() + " " + msg
+   6   ENDPROC
+   7   
+  \`\`\`
+
+- \`common/common.tl:8\`: name="fail", kind="PROC"
+  \`\`\`
+   5     LOG NOW() + " " + msg
+   6   ENDPROC
+   7   
+   8 > PROC fail(msg)
+   9     LOG "FAILED: " + msg
+  10     CALL log_event(msg)
+  11   ENDPROC
+  \`\`\`
+
+- \`common/dates.tl:3\`: name="month_start", kind="FUNC"
+  \`\`\`
+   1   MODULE dates
+   2   
+   3 > FUNC month_start(d) RETURNS DATE
+   4     -- "PROC" and "FUNC" in the messages below are plain text
+   5     LOG "FUNC month_start called"
+   6     RETURN d
+  \`\`\`
+
+- \`common/dates.tl:9\`: name="is_weekend", kind="FUNC"
+  \`\`\`
+   6     RETURN d
+   7   ENDFUNC
+   8   
+   9 > FUNC is_weekend(d) RETURNS BOOLEAN
+  10     LET PROCESSOR = "dates"
+  11     RETURN 0
+  12   ENDFUNC
+  \`\`\`
+
+- \`customers/customers.tl:4\`: name="load_customer", kind="PROC"
+  \`\`\`
+   1   MODULE customers
+   2   INCLUDE "common.tl"
+   3   
+   4 > PROC load_customer(cid)
+   5     read customers WHERE id = cid INTO cust
+   6     IF FLAG ( "vip-program" ) THEN
+   7       READ vip_benefits WHERE customer_id = cid
+  \`\`\`
+
+- \`customers/customers.tl:11\`: name="merge_customers", kind="PROC"
+  \`\`\`
+   8     ENDIF
+   9   ENDPROC
+  10   
+  11 > PROC merge_customers(a, b)
+  12     WRITE customers SET merged_into = a WHERE id = b
+  13     WRITE customer_audit SET event = "merge", ref = b
+  14   ENDPROC
+  \`\`\`
+
+- \`customers/messages.tl:3\`: name="unread_count", kind="PROC"
+  \`\`\`
+   1   MODULE messages
+   2   
+   3 > PROC unread_count(uid)
+   4     READ inbox WHERE owner = uid AND NOT read
+   5     LET n = ROWCOUNT()
+   6     RETURN n
+  \`\`\`
+
+- \`customers/messages.tl:9\`: name="mark_read", kind="PROC"
+  \`\`\`
+   6     RETURN n
+   7   ENDPROC
+   8   
+   9 > PROC mark_read(msg_id)
+  10     WRITE inbox SET read = 1 WHERE id = msg_id
+  11   ENDPROC
+  12   
+  \`\`\`
+
+- \`inventory/stock.tl:4\`: name="refresh_stock", kind="PROC"
+  \`\`\`
+   1   MODULE stock
+   2   INCLUDE "inventory/warehouse.tl"
+   3   
+   4 > PROC refresh_stock()
+   5   	READ	stock_levels WHERE qty < reorder_level
+   6   	WHILE ROWCOUNT() > 0 DO
+   7   		CALL warehouse.reorder(product_id)
+  \`\`\`
+
+- \`inventory/stock.tl:14\`: name="notify_buyer", kind="PROC"
+  \`\`\`
+  11   	ENDWHILE
+  12   ENDPROC
+  13   
+  14 > PROC notify_buyer(product_id)
+  15   	LOG "reorder " + product_id
+  16   ENDPROC
+  17   
+  \`\`\`
+
+- \`inventory/warehouse.tl:3\`: name="reorder", kind="PROC"
+  \`\`\`
+   1   MODULE warehouse
+   2   
+   3 > PROC reorder(product_id)
+   4     LOG "/*"; CALL sync_warehouse(product_id)
+   5     /* old: CALL legacy_reorder(product_id) */ CALL place_order(product_id)
+   6     WRITE purchase_orders SET product = product_id
+  \`\`\`
+
+- \`inventory/warehouse.tl:9\`: name="sync_warehouse", kind="PROC"
+  \`\`\`
+   6     WRITE purchase_orders SET product = product_id
+   7   ENDPROC
+   8   
+   9 > PROC sync_warehouse(product_id)
+  10     /* note: "sync path is slow, see ticket 4711 */ CALL common.log_event("sync")
+  11     LOG "syncing"
+  12   ENDPROC
+  \`\`\`
+
+- \`inventory/warehouse.tl:14\`: name="place_order", kind="PROC"
+  \`\`\`
+  11     LOG "syncing"
+  12   ENDPROC
+  13   
+  14 > PROC place_order(product_id)
+  15     RETURN
+  16   ENDPROC
+  17   
+  \`\`\`
+
+- \`legacy/dos_export.tl:4\`: name="export_orders", kind="PROC"
+  \`\`\`
+   1   MODULE dos_export
+   2   INCLUDE "common.tl"
+   3   
+   4 > PROC export_orders()
+   5     READ orders WHERE exported = 0
+   6     WRITE export_log SET n = ROWCOUNT()
+   7   ENDPROC
+  \`\`\`
+
+- \`legacy/old_billing.tl:14\`: name="placeholder", kind="PROC"
+  \`\`\`
+  11     ENTRY old_nightly -> calc_total_old
+  12   */
+  13   
+  14 > PROC placeholder()
+  15     RETURN
+  16   ENDPROC
+  17   ENDPROC
+  \`\`\`
+
+- \`orders/dispatch.tl:4\`: name="dispatch", kind="PROC"
+  \`\`\`
+   1   MODULE dispatch
+   2   -- Dispatches an order to the handler configured for its channel.
+   3   
+   4 > PROC dispatch(order_id, channel)
+   5     READ channel_handlers WHERE channel = channel INTO handler_name
+   6     -- The handler name is only known at run time:
+   7     CALL DYNAMIC handler_name(order_id)
+  \`\`\`
+
+- \`orders/order_lines.tl:3\`: name="load_lines", kind="PROC"
+  \`\`\`
+   1   MODULE order_lines
+   2   
+   3 > PROC load_lines(oid)
+   4     READ &
+   5         order_lines WHERE order_id = oid
+   6     READ products WHERE id = line_product; READ stock_levels WHERE product = line_product
+  \`\`\`
+
+- \`orders/orders.tl:4\`: name="load_order", kind="PROC"
+  \`\`\`
+   1   MODULE orders
+   2   INCLUDE "common.tl"
+   3   
+   4 > PROC load_order(order_id)
+   5     READ orders WHERE id = order_id INTO ord
+   6     IF ord_status = "new" THEN
+   7       CALL billing.calc_total(order_id)
+  \`\`\`
+
+- \`orders/orders.tl:16\`: name="close_day", kind="PROC"
+  \`\`\`
+  13     ENDIF
+  14   ENDPROC
+  15   
+  16 > PROC close_day()
+  17     WHILE pending > 0 DO
+  18       READ orders WHERE status = "open" INTO ord
+  19       WRITE orders SET status = "closed" WHERE id = ord_id
+  \`\`\`
+
+- \`reporting/month_end.tl:4\`: name="close_month", kind="proc"
+  \`\`\`
+   1   module month_end
+   2   include "common.tl"
+   3   
+   4 > proc close_month()
+   5     read ledger where period = current_period into led
+   6     if flag("month_end_v2") then
+   7       call post_accruals(current_period)
+  \`\`\`
+
+- \`reporting/month_end.tl:12\`: name="post_accruals", kind="proc"
+  \`\`\`
+   9     write ledger set closed = 1 where period = current_period
+  10   endproc
+  11   
+  12 > proc post_accruals(period)
+  13     write accruals set period = period
+  14   endproc
+  15   
+  \`\`\`
+
+- \`reporting/reports.tl:4\`: name="build_report", kind="PROC"
+  \`\`\`
+   1   MODULE reports
+   2   INCLUDE "common.tl"
+   3   
+   4 > PROC build_report()
+   5     EXEC "READ audit_log WHERE day = today"
+   6     EXEC "WRITE report_cache SET built = 1"
+   7     READ report_definitions INTO defs
+  \`\`\`
+
+
+**Provenance**
+
+- \`skills/procedure.md\` § defining-a-procedure — examples: proc-01, proc-02, proc-03, proc-04, proc-05, proc-06, proc-neg-01, proc-neg-02, proc-neg-03
+
+### \`call-statement\` (call) — OK
+
+- Pattern: \`regex: /\\bCALL\\s+(?:(?<module>[A-Za-z_][A-Za-z0-9_]*)\\.)?(?<callee>[A-Za-z_][A-Za-z0-9_]*)\\s*\\(/i (per line)\`
+- Captures: callee → callee, module → module
+- Confidence: **high** (declared: high) — high — 7/7 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Pass rate (own examples): 100% (10/10)
+
+**Representative matches** (passed positive examples):
+
+- \`call-01\` (call): callee="apply_discount"
+  location: call.md:21 (example call-01)
+  \`\`\`
+   1 > CALL apply_discount(order_id)
+  \`\`\`
+
+- \`call-02\` (call): module="billing", callee="apply_discount"
+  location: call.md:33 (example call-02)
+  \`\`\`
+   1 > CALL billing.apply_discount(order_id)
+  \`\`\`
+
+- \`call-03\` (call): callee="reset_totals"
+  location: call.md:45 (example call-03)
+  \`\`\`
+   1 > call reset_totals(); CALL log_event("reset")
+  \`\`\`
+
+- \`call-04\` (call): callee="new_proc"
+  location: call.md:60 (example call-04)
+  \`\`\`
+   1   LET x = 1 -- CALL old_proc() is gone /* not a block comment
+   2 > CALL new_proc(x)
+  \`\`\`
+
+- \`call-05\` (call): callee="apply_discount"
+  location: call/call-05.tl (example call-05)
+  \`\`\`
+   2     IF FLAG("new_pricing") THEN
+   3       IF order_id > 0 THEN
+   4 >       LOG "-- pricing v2 --"; CALL apply_discount(order_id)
+   5       ENDIF
+   6     ELSE
+  \`\`\`
+
+- \`call-06\` (call): callee="net_price"
+  location: call/call-06.tl (example call-06)
+  \`\`\`
+   1 > CALL net_price(amount, &
+   2                  region) INTO price
+   3   CALL RECALL_orders(batch_id)
+  \`\`\`
+
+- \`call-07\` (call): module="orders", callee="reprocess"
+  location: call/call-07.tl (example call-07)
+  \`\`\`
+   1   IF retry THEN
+   2 >   call orders.reprocess(batch_id) INTO result
+   3   ENDIF
+  \`\`\`
+
+
+**Missed examples** (expected but not found):
+
+_None._
+
+**Wrong captures** (matched the right line, wrong values):
+
+_None._
+
+**False positives** (matched a negative example):
+
+_None._
+
+
+**Unreviewed sample matches** (20, run \`lsc review\` to label them):
+
+- \`admin/audit.tl:8\`, in \`record\`: callee="RECALL_orders"
+  \`\`\`
+   5     LET RECALL_count = RECALL_count + 1
+   6     LET PROCESSOR = "audit"
+   7     WRITE audit_log SET event = event, read = 0, write = 1
+   8 >   CALL RECALL_orders(event)
+   9   ENDPROC
+  10   
+  11   PROC RECALL_orders(event)
+  \`\`\`
+
+- \`batch/nightly.tl:5\`, in \`run_all\`: callee="calc_total", module="billing"
+  \`\`\`
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC run_all()
+   5 >   CALL billing.calc_total(0)
+   6     CALL &
+   7         late_bound_cleanup()
+   8     CALL orders.close_day()
+  \`\`\`
+
+- \`batch/nightly.tl:8\`, in \`run_all\`: callee="close_day", module="orders"
+  \`\`\`
+   5     CALL billing.calc_total(0)
+   6     CALL &
+   7         late_bound_cleanup()
+   8 >   CALL orders.close_day()
+   9   ENDPROC
+  10   
+  11   PROC late_bound_cleanup()
+  \`\`\`
+
+- \`batch/retry.tl:7\`, in \`retry_failed\`: callee="log_event", module="common"
+  \`\`\`
+   4   PROC retry_failed()
+   5     READ failed_jobs WHERE attempts < 3 INTO job
+   6     IF ROWCOUNT() > 0 THEN
+   7 >     CALL common.log_event("retrying")
+   8     ENDIF
+   9   -- ENDPROC is missing: the interpreter closes the procedure at end of file
+  10   
+  \`\`\`
+
+- \`billing/billing.tl:10\`, in \`calc_total\`: callee="apply_discount"
+  \`\`\`
+   7     READ orders WHERE id = order_id INTO ord
+   8     LET t = 0
+   9     IF FLAG("new_pricing") THEN
+  10 >     CALL apply_discount(order_id)
+  11       CALL rates.net_price(ord_amount) INTO t
+  12     ELSE
+  13       CALL legacy_total(order_id) INTO t
+  \`\`\`
+
+- \`billing/billing.tl:11\`, in \`calc_total\`: callee="net_price", module="rates"
+  \`\`\`
+   8     LET t = 0
+   9     IF FLAG("new_pricing") THEN
+  10       CALL apply_discount(order_id)
+  11 >     CALL rates.net_price(ord_amount) INTO t
+  12     ELSE
+  13       CALL legacy_total(order_id) INTO t
+  14     ENDIF
+  \`\`\`
+
+- \`billing/billing.tl:13\`, in \`calc_total\`: callee="legacy_total"
+  \`\`\`
+  10       CALL apply_discount(order_id)
+  11       CALL rates.net_price(ord_amount) INTO t
+  12     ELSE
+  13 >     CALL legacy_total(order_id) INTO t
+  14     ENDIF
+  15     WRITE invoices SET total = t, order_ref = order_id
+  16     RETURN
+  \`\`\`
+
+- \`billing/invoices.tl:11\`, in \`close_invoice\`: callee="log_event", module="common"
+  \`\`\`
+   8           closed_at = NOW() &
+   9       WHERE id = inv_id
+  10     WRITE invoice_history SET inv = inv_id, event = "closed"
+  11 >   CALL common.log_event("invoice closed")
+  12   ENDPROC
+  13   
+  14   PROC reopen_invoice(inv_id)
+  \`\`\`
+
+- \`common/common.tl:10\`, in \`fail\`: callee="log_event"
+  \`\`\`
+   7   
+   8   PROC fail(msg)
+   9     LOG "FAILED: " + msg
+  10 >   CALL log_event(msg)
+  11   ENDPROC
+  12   
+  \`\`\`
+
+- \`inventory/stock.tl:7\`, in \`refresh_stock\`: callee="reorder", module="warehouse"
+  \`\`\`
+   4   PROC refresh_stock()
+   5   	READ	stock_levels WHERE qty < reorder_level
+   6   	WHILE ROWCOUNT() > 0 DO
+   7 > 		CALL warehouse.reorder(product_id)
+   8   		IF urgent THEN
+   9   			CALL notify_buyer(product_id)
+  10   		ENDIF
+  \`\`\`
+
+- \`inventory/stock.tl:9\`, in \`refresh_stock\`: callee="notify_buyer"
+  \`\`\`
+   6   	WHILE ROWCOUNT() > 0 DO
+   7   		CALL warehouse.reorder(product_id)
+   8   		IF urgent THEN
+   9 > 			CALL notify_buyer(product_id)
+  10   		ENDIF
+  11   	ENDWHILE
+  12   ENDPROC
+  \`\`\`
+
+- \`inventory/warehouse.tl:4\`, in \`reorder\`: callee="sync_warehouse"
+  \`\`\`
+   1   MODULE warehouse
+   2   
+   3   PROC reorder(product_id)
+   4 >   LOG "/*"; CALL sync_warehouse(product_id)
+   5     /* old: CALL legacy_reorder(product_id) */ CALL place_order(product_id)
+   6     WRITE purchase_orders SET product = product_id
+   7   ENDPROC
+  \`\`\`
+
+- \`inventory/warehouse.tl:5\`, in \`reorder\`: callee="place_order"
+  \`\`\`
+   2   
+   3   PROC reorder(product_id)
+   4     LOG "/*"; CALL sync_warehouse(product_id)
+   5 >   /* old: CALL legacy_reorder(product_id) */ CALL place_order(product_id)
+   6     WRITE purchase_orders SET product = product_id
+   7   ENDPROC
+   8   
+  \`\`\`
+
+- \`inventory/warehouse.tl:10\`, in \`sync_warehouse\`: callee="log_event", module="common"
+  \`\`\`
+   7   ENDPROC
+   8   
+   9   PROC sync_warehouse(product_id)
+  10 >   /* note: "sync path is slow, see ticket 4711 */ CALL common.log_event("sync")
+  11     LOG "syncing"
+  12   ENDPROC
+  13   
+  \`\`\`
+
+- \`orders/dispatch.tl:8\`, in \`dispatch\`: callee="log_event", module="common"
+  \`\`\`
+   5     READ channel_handlers WHERE channel = channel INTO handler_name
+   6     -- The handler name is only known at run time:
+   7     CALL DYNAMIC handler_name(order_id)
+   8 >   CALL common.log_event("dispatched")
+   9   ENDPROC
+  10   
+  \`\`\`
+
+- \`orders/orders.tl:7\`, in \`load_order\`: callee="calc_total", module="billing"
+  \`\`\`
+   4   PROC load_order(order_id)
+   5     READ orders WHERE id = order_id INTO ord
+   6     IF ord_status = "new" THEN
+   7 >     CALL billing.calc_total(order_id)
+   8       IF FLAG("fast_shipping") THEN
+   9         CALL shipping.book_express(order_id)
+  10       ELSE
+  \`\`\`
+
+- \`orders/orders.tl:9\`, in \`load_order\`: callee="book_express", module="shipping"
+  \`\`\`
+   6     IF ord_status = "new" THEN
+   7       CALL billing.calc_total(order_id)
+   8       IF FLAG("fast_shipping") THEN
+   9 >       CALL shipping.book_express(order_id)
+  10       ELSE
+  11         CALL shipping.book_standard(order_id)
+  12       ENDIF
+  \`\`\`
+
+- \`orders/orders.tl:11\`, in \`load_order\`: callee="book_standard", module="shipping"
+  \`\`\`
+   8       IF FLAG("fast_shipping") THEN
+   9         CALL shipping.book_express(order_id)
+  10       ELSE
+  11 >       CALL shipping.book_standard(order_id)
+  12       ENDIF
+  13     ENDIF
+  14   ENDPROC
+  \`\`\`
+
+- \`reporting/month_end.tl:7\`, in \`close_month\`: callee="post_accruals"
+  \`\`\`
+   4   proc close_month()
+   5     read ledger where period = current_period into led
+   6     if flag("month_end_v2") then
+   7 >     call post_accruals(current_period)
+   8     endif
+   9     write ledger set closed = 1 where period = current_period
+  10   endproc
+  \`\`\`
+
+- \`reporting/reports.tl:8\`, in \`build_report\`: callee="log_event", module="common"
+  \`\`\`
+   5     EXEC "READ audit_log WHERE day = today"
+   6     EXEC "WRITE report_cache SET built = 1"
+   7     READ report_definitions INTO defs
+   8 >   CALL common.log_event("report built")
+   9   ENDPROC
+  10   
+  11   ENTRY weekly_report -> build_report
+  \`\`\`
+
+
+**Provenance**
+
+- \`skills/call.md\` § calling-a-procedure — examples: call-01, call-02, call-03, call-04, call-05, call-06, call-07, call-neg-01, call-neg-02, call-neg-03
+
+### \`include-directive\` (include) — OK
+
+- Pattern: \`regex: /^\\s*INCLUDE\\s+"(?<target>[^"]+)"/i (per line)\`
+- Captures: target → target
+- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Pass rate (own examples): 100% (9/9)
+
+**Representative matches** (passed positive examples):
+
+- \`include-01\` (include): target="common.tl"
+  location: include.md:13 (example include-01)
+  \`\`\`
+   1 > INCLUDE "common.tl"
+  \`\`\`
+
+- \`include-02\` (include): target="lib/dates.tl"
+  location: include.md:25 (example include-02)
+  \`\`\`
+   1 > include "lib/dates.tl"   -- date helpers
+  \`\`\`
+
+- \`include-03\` (include): target="common.tl"
+  location: include.md:37 (example include-03)
+  \`\`\`
+   1   MODULE billing
+   2 > INCLUDE "common.tl"
+   3   INCLUDE "billing/rates.tl"
+  \`\`\`
+
+- \`include-04\` (include): target="shared/constants.tl"
+  location: include/include-04.tl (example include-04)
+  \`\`\`
+   1 > 	INCLUDE    "shared/constants.tl"
+  \`\`\`
+
+- \`include-05\` (include): target="legacy--compat.tl"
+  location: include/include-05.tl (example include-05)
+  \`\`\`
+   1 > INCLUDE "legacy--compat.tl"
+  \`\`\`
+
+- \`include-06\` (include): target="orders.tl"
+  location: include/include-06.tl (example include-06)
+  \`\`\`
+   1 > INCLUDE "orders.tl" -- also "orders_old.tl" once migrated
+  \`\`\`
+
+
+**Missed examples** (expected but not found):
+
+_None._
+
+**Wrong captures** (matched the right line, wrong values):
+
+_None._
+
+**False positives** (matched a negative example):
+
+_None._
+
+
+**Unreviewed sample matches** (14, run \`lsc review\` to label them):
+
+- \`admin/audit.tl:2\`: target="legacy--compat.tl"
+  \`\`\`
+   1   MODULE audit
+   2 > INCLUDE "legacy--compat.tl"
+   3   
+   4   PROC record(event)
+   5     LET RECALL_count = RECALL_count + 1
+  \`\`\`
+
+- \`admin/flags.tl:3\`: target="common.tl"
+  \`\`\`
+   1   MODULE flags
+   2   -- Flag overview for operations. Note: "don't remove flags here
+   3 > INCLUDE "common.tl"
+   4   
+   5   PROC check_flags(flag_name)
+   6     LET enabled = FLAG(flag_name)
+  \`\`\`
+
+- \`batch/nightly.tl:2\`: target="common.tl"
+  \`\`\`
+   1   MODULE nightly
+   2 > INCLUDE "common.tl"
+   3   
+   4   PROC run_all()
+   5     CALL billing.calc_total(0)
+  \`\`\`
+
+- \`batch/retry.tl:2\`: target="common.tl"
+  \`\`\`
+   1   MODULE retry
+   2 > INCLUDE "common.tl"
+   3   
+   4   PROC retry_failed()
+   5     READ failed_jobs WHERE attempts < 3 INTO job
+  \`\`\`
+
+- \`billing/billing.tl:2\`: target="common.tl"
+  \`\`\`
+   1   MODULE billing
+   2 > INCLUDE "common.tl"
+   3   INCLUDE "billing/rates.tl"
+   4   -- Nightly invoice run. Owner: finance batch team.
+   5   
+  \`\`\`
+
+- \`billing/billing.tl:3\`: target="billing/rates.tl"
+  \`\`\`
+   1   MODULE billing
+   2   INCLUDE "common.tl"
+   3 > INCLUDE "billing/rates.tl"
+   4   -- Nightly invoice run. Owner: finance batch team.
+   5   
+   6   PROC calc_total(order_id)
+  \`\`\`
+
+- \`billing/invoices.tl:2\`: target="common.tl"
+  \`\`\`
+   1   MODULE invoices
+   2 > INCLUDE "common.tl"
+   3   
+   4   PROC close_invoice(inv_id)
+   5     READ invoices WHERE id = inv_id INTO inv
+  \`\`\`
+
+- \`billing/rates.tl:2\`: target="common.tl"
+  \`\`\`
+   1   MODULE rates
+   2 > INCLUDE "common.tl"
+   3   
+   4   FUNC net_price(amount) RETURNS NUMBER
+   5     LET vat = 0.2
+  \`\`\`
+
+- \`customers/customers.tl:2\`: target="common.tl"
+  \`\`\`
+   1   MODULE customers
+   2 > INCLUDE "common.tl"
+   3   
+   4   PROC load_customer(cid)
+   5     read customers WHERE id = cid INTO cust
+  \`\`\`
+
+- \`inventory/stock.tl:2\`: target="inventory/warehouse.tl"
+  \`\`\`
+   1   MODULE stock
+   2 > INCLUDE "inventory/warehouse.tl"
+   3   
+   4   PROC refresh_stock()
+   5   	READ	stock_levels WHERE qty < reorder_level
+  \`\`\`
+
+- \`legacy/dos_export.tl:2\`: target="common.tl"
+  \`\`\`
+   1   MODULE dos_export
+   2 > INCLUDE "common.tl"
+   3   
+   4   PROC export_orders()
+   5     READ orders WHERE exported = 0
+  \`\`\`
+
+- \`orders/orders.tl:2\`: target="common.tl"
+  \`\`\`
+   1   MODULE orders
+   2 > INCLUDE "common.tl"
+   3   
+   4   PROC load_order(order_id)
+   5     READ orders WHERE id = order_id INTO ord
+  \`\`\`
+
+- \`reporting/month_end.tl:2\`: target="common.tl"
+  \`\`\`
+   1   module month_end
+   2 > include "common.tl"
+   3   
+   4   proc close_month()
+   5     read ledger where period = current_period into led
+  \`\`\`
+
+- \`reporting/reports.tl:2\`: target="common.tl"
+  \`\`\`
+   1   MODULE reports
+   2 > INCLUDE "common.tl"
+   3   
+   4   PROC build_report()
+   5     EXEC "READ audit_log WHERE day = today"
+  \`\`\`
+
+
+**Provenance**
+
+- \`skills/include.md\` § including-a-file — examples: include-01, include-02, include-03, include-04, include-05, include-06, include-neg-01, include-neg-02, include-neg-03
+
+### \`db-read\` (db_read) — OK
+
+- Pattern: \`regex: /\\bREAD\\s+(?:&\\s+)?(?<table>[A-Za-z_][A-Za-z0-9_]*)/i (whole file)\`
+- Captures: table → table
+- Confidence: **high** (declared: high) — high — 7/7 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Pass rate (own examples): 100% (10/10)
+
+**Representative matches** (passed positive examples):
+
+- \`read-01\` (db-read): table="orders"
+  location: db-read.md:19 (example read-01)
+  \`\`\`
+   1 > READ orders WHERE id = order_id
+  \`\`\`
+
+- \`read-02\` (db-read): table="customers"
+  location: db-read.md:29 (example read-02)
+  \`\`\`
+   1 > read customers WHERE id = cid INTO cust
+  \`\`\`
+
+- \`read-03\` (db-read): table="order_lines"
+  location: db-read.md:41 (example read-03)
+  \`\`\`
+   1 > READ &
+   2       order_lines WHERE order_id = oid
+  \`\`\`
+
+- \`read-04\` (db-read): table="rates"
+  location: db-read.md:54 (example read-04)
+  \`\`\`
+   1 > READ rates; READ currencies WHERE code = cur
+  \`\`\`
+
+- \`read-05\` (db-read): table="customers"
+  location: db-read/read-05.tl (example read-05)
+  \`\`\`
+   1   PROC load_customer(cid)
+   2     IF cid > 0 THEN
+   3 >     READ customers WHERE id = cid INTO cust
+   4       IF vip = 1 THEN
+   5         READ vip_benefits WHERE customer_id = cid
+  \`\`\`
+
+- \`read-06\` (db-read): table="invoices"
+  location: db-read/read-06.tl (example read-06)
+  \`\`\`
+   1 > READ invoices WHERE paid = 0 -- READ payments later
+  \`\`\`
+
+- \`read-07\` (db-read): table="stock_levels"
+  location: db-read/read-07.tl (example read-07)
+  \`\`\`
+   1 > 	Read	stock_levels WHERE qty < 10
+  \`\`\`
+
+
+**Missed examples** (expected but not found):
+
+_None._
+
+**Wrong captures** (matched the right line, wrong values):
+
+_None._
+
+**False positives** (matched a negative example):
+
+_None._
+
+
+**Unreviewed sample matches** (20, run \`lsc review\` to label them):
+
+- \`batch/retry.tl:5\`, in \`retry_failed\`: table="failed_jobs"
+  \`\`\`
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC retry_failed()
+   5 >   READ failed_jobs WHERE attempts < 3 INTO job
+   6     IF ROWCOUNT() > 0 THEN
+   7       CALL common.log_event("retrying")
+   8     ENDIF
+  \`\`\`
+
+- \`billing/billing.tl:7\`, in \`calc_total\`: table="orders"
+  \`\`\`
+   4   -- Nightly invoice run. Owner: finance batch team.
+   5   
+   6   PROC calc_total(order_id)
+   7 >   READ orders WHERE id = order_id INTO ord
+   8     LET t = 0
+   9     IF FLAG("new_pricing") THEN
+  10       CALL apply_discount(order_id)
+  \`\`\`
+
+- \`billing/billing.tl:20\`, in \`apply_discount\`: table="discounts"
+  \`\`\`
+  17   ENDPROC
+  18   
+  19   PROC apply_discount(order_id)
+  20 >   READ discounts WHERE order_id = order_id
+  21     IF ROWCOUNT() > 0 THEN
+  22       IF FLAG("stacked_discounts") THEN
+  23         LOG "stacking discounts for " + order_id
+  \`\`\`
+
+- \`billing/billing.tl:30\`, in \`legacy_total\`: table="order_lines"
+  \`\`\`
+  27   
+  28   PROC legacy_total(order_id)
+  29     -- CALL old_total(order_id) replaced in 2021
+  30 >   READ order_lines WHERE order_id = order_id
+  31     RETURN
+  32   ENDPROC
+  33   
+  \`\`\`
+
+- \`billing/invoices.tl:5\`, in \`close_invoice\`: table="invoices"
+  \`\`\`
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC close_invoice(inv_id)
+   5 >   READ invoices WHERE id = inv_id INTO inv
+   6     WRITE invoices &
+   7       SET status = "closed", &
+   8           closed_at = NOW() &
+  \`\`\`
+
+- \`billing/rates.tl:7\`, in \`net_price\`: table="vat_rates"
+  \`\`\`
+   4   FUNC net_price(amount) RETURNS NUMBER
+   5     LET vat = 0.2
+   6     IF FLAG("eu_vat") AND FLAG("vat.v2") THEN
+   7 >     READ vat_rates WHERE region = current_region INTO vat
+   8     ENDIF
+   9     RETURN amount * (1 + vat)
+  10   ENDFUNC
+  \`\`\`
+
+- \`customers/customers.tl:5\`, in \`load_customer\`: table="customers"
+  \`\`\`
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC load_customer(cid)
+   5 >   read customers WHERE id = cid INTO cust
+   6     IF FLAG ( "vip-program" ) THEN
+   7       READ vip_benefits WHERE customer_id = cid
+   8     ENDIF
+  \`\`\`
+
+- \`customers/customers.tl:7\`, in \`load_customer\`: table="vip_benefits"
+  \`\`\`
+   4   PROC load_customer(cid)
+   5     read customers WHERE id = cid INTO cust
+   6     IF FLAG ( "vip-program" ) THEN
+   7 >     READ vip_benefits WHERE customer_id = cid
+   8     ENDIF
+   9   ENDPROC
+  10   
+  \`\`\`
+
+- \`customers/messages.tl:4\`, in \`unread_count\`: table="inbox"
+  \`\`\`
+   1   MODULE messages
+   2   
+   3   PROC unread_count(uid)
+   4 >   READ inbox WHERE owner = uid AND NOT read
+   5     LET n = ROWCOUNT()
+   6     RETURN n
+   7   ENDPROC
+  \`\`\`
+
+- \`customers/messages.tl:4\`, in \`unread_count\`: table="LET"
+  \`\`\`
+   1   MODULE messages
+   2   
+   3   PROC unread_count(uid)
+   4 >   READ inbox WHERE owner = uid AND NOT read
+   5     LET n = ROWCOUNT()
+   6     RETURN n
+   7   ENDPROC
+  \`\`\`
+
+- \`inventory/stock.tl:5\`, in \`refresh_stock\`: table="stock_levels"
+  \`\`\`
+   2   INCLUDE "inventory/warehouse.tl"
+   3   
+   4   PROC refresh_stock()
+   5 > 	READ	stock_levels WHERE qty < reorder_level
+   6   	WHILE ROWCOUNT() > 0 DO
+   7   		CALL warehouse.reorder(product_id)
+   8   		IF urgent THEN
+  \`\`\`
+
+- \`legacy/dos_export.tl:5\`, in \`export_orders\`: table="orders"
+  \`\`\`
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC export_orders()
+   5 >   READ orders WHERE exported = 0
+   6     WRITE export_log SET n = ROWCOUNT()
+   7   ENDPROC
+   8   
+  \`\`\`
+
+- \`orders/dispatch.tl:5\`, in \`dispatch\`: table="channel_handlers"
+  \`\`\`
+   2   -- Dispatches an order to the handler configured for its channel.
+   3   
+   4   PROC dispatch(order_id, channel)
+   5 >   READ channel_handlers WHERE channel = channel INTO handler_name
+   6     -- The handler name is only known at run time:
+   7     CALL DYNAMIC handler_name(order_id)
+   8     CALL common.log_event("dispatched")
+  \`\`\`
+
+- \`orders/order_lines.tl:4\`, in \`load_lines\`: table="order_lines"
+  \`\`\`
+   1   MODULE order_lines
+   2   
+   3   PROC load_lines(oid)
+   4 >   READ &
+   5         order_lines WHERE order_id = oid
+   6     READ products WHERE id = line_product; READ stock_levels WHERE product = line_product
+   7   ENDPROC
+  \`\`\`
+
+- \`orders/order_lines.tl:6\`, in \`load_lines\`: table="products"
+  \`\`\`
+   3   PROC load_lines(oid)
+   4     READ &
+   5         order_lines WHERE order_id = oid
+   6 >   READ products WHERE id = line_product; READ stock_levels WHERE product = line_product
+   7   ENDPROC
+   8   
+  \`\`\`
+
+- \`orders/order_lines.tl:6\`, in \`load_lines\`: table="stock_levels"
+  \`\`\`
+   3   PROC load_lines(oid)
+   4     READ &
+   5         order_lines WHERE order_id = oid
+   6 >   READ products WHERE id = line_product; READ stock_levels WHERE product = line_product
+   7   ENDPROC
+   8   
+  \`\`\`
+
+- \`orders/orders.tl:5\`, in \`load_order\`: table="orders"
+  \`\`\`
+   2   INCLUDE "common.tl"
+   3   
+   4   PROC load_order(order_id)
+   5 >   READ orders WHERE id = order_id INTO ord
+   6     IF ord_status = "new" THEN
+   7       CALL billing.calc_total(order_id)
+   8       IF FLAG("fast_shipping") THEN
+  \`\`\`
+
+- \`orders/orders.tl:18\`, in \`close_day\`: table="orders"
+  \`\`\`
+  15   
+  16   PROC close_day()
+  17     WHILE pending > 0 DO
+  18 >     READ orders WHERE status = "open" INTO ord
+  19       WRITE orders SET status = "closed" WHERE id = ord_id
+  20       LET pending = pending - 1
+  21     ENDWHILE
+  \`\`\`
+
+- \`reporting/month_end.tl:5\`, in \`close_month\`: table="ledger"
+  \`\`\`
+   2   include "common.tl"
+   3   
+   4   proc close_month()
+   5 >   read ledger where period = current_period into led
+   6     if flag("month_end_v2") then
+   7       call post_accruals(current_period)
+   8     endif
+  \`\`\`
+
+- \`reporting/reports.tl:7\`, in \`build_report\`: table="report_definitions"
+  \`\`\`
+   4   PROC build_report()
+   5     EXEC "READ audit_log WHERE day = today"
+   6     EXEC "WRITE report_cache SET built = 1"
+   7 >   READ report_definitions INTO defs
+   8     CALL common.log_event("report built")
+   9   ENDPROC
+  10   
+  \`\`\`
+
+
+**Provenance**
+
+- \`skills/db-read.md\` § reading-a-table — examples: read-01, read-02, read-03, read-04, read-05, read-06, read-07, read-neg-01, read-neg-02, read-neg-03
+
+### \`db-write\` (db_write) — OK
+
+- Pattern: \`regex: /\\bWRITE\\s+(?<table>[A-Za-z_][A-Za-z0-9_]*)/i (per line)\`
+- Captures: table → table
+- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Pass rate (own examples): 100% (9/9)
+
+**Representative matches** (passed positive examples):
+
+- \`write-01\` (db-write): table="invoices"
+  location: db-write.md:13 (example write-01)
+  \`\`\`
+   1 > WRITE invoices SET total = t
+  \`\`\`
+
+- \`write-02\` (db-write): table="invoices"
+  location: db-write.md:23 (example write-02)
+  \`\`\`
+   1 > WRITE invoices &
+   2     SET total = t, paid = 0
+  \`\`\`
+
+- \`write-03\` (db-write): table="orders"
+  location: db-write.md:34 (example write-03)
+  \`\`\`
+   1 > write orders SET status = "shipped" WHERE id = oid
+  \`\`\`
+
+- \`write-04\` (db-write): table="orders"
+  location: db-write/write-04.tl (example write-04)
+  \`\`\`
+   1   PROC close_order(oid)
+   2     READ orders WHERE id = oid
+   3 >   WRITE orders SET status = "closed" WHERE id = oid
+   4     WRITE audit_log SET event = "close", ref = oid
+   5   ENDPROC
+  \`\`\`
+
+- \`write-05\` (db-write): table="invoice_history"
+  location: db-write/write-05.tl (example write-05)
+  \`\`\`
+   1 > LOG "WRITE invoices"; WRITE invoice_history SET n = n + 1
+  \`\`\`
+
+- \`write-06\` (db-write): table="stock_levels"
+  location: db-write/write-06.tl (example write-06)
+  \`\`\`
+   1 > WRITE	stock_levels SET qty = qty - 1
+  \`\`\`
+
+
+**Missed examples** (expected but not found):
+
+_None._
+
+**Wrong captures** (matched the right line, wrong values):
+
+_None._
+
+**False positives** (matched a negative example):
+
+_None._
+
+
+**Unreviewed sample matches** (13, run \`lsc review\` to label them):
+
+- \`admin/audit.tl:7\`, in \`record\`: table="audit_log"
+  \`\`\`
+   4   PROC record(event)
+   5     LET RECALL_count = RECALL_count + 1
+   6     LET PROCESSOR = "audit"
+   7 >   WRITE audit_log SET event = event, read = 0, write = 1
+   8     CALL RECALL_orders(event)
+   9   ENDPROC
+  10   
+  \`\`\`
+
+- \`billing/billing.tl:15\`, in \`calc_total\`: table="invoices"
+  \`\`\`
+  12     ELSE
+  13       CALL legacy_total(order_id) INTO t
+  14     ENDIF
+  15 >   WRITE invoices SET total = t, order_ref = order_id
+  16     RETURN
+  17   ENDPROC
+  18   
+  \`\`\`
+
+- \`billing/invoices.tl:6\`, in \`close_invoice\`: table="invoices"
+  \`\`\`
+   3   
+   4   PROC close_invoice(inv_id)
+   5     READ invoices WHERE id = inv_id INTO inv
+   6 >   WRITE invoices &
+   7       SET status = "closed", &
+   8           closed_at = NOW() &
+   9       WHERE id = inv_id
+  \`\`\`
+
+- \`billing/invoices.tl:10\`, in \`close_invoice\`: table="invoice_history"
+  \`\`\`
+   7       SET status = "closed", &
+   8           closed_at = NOW() &
+   9       WHERE id = inv_id
+  10 >   WRITE invoice_history SET inv = inv_id, event = "closed"
+  11     CALL common.log_event("invoice closed")
+  12   ENDPROC
+  13   
+  \`\`\`
+
+- \`billing/invoices.tl:16\`, in \`reopen_invoice\`: table="invoices"
+  \`\`\`
+  13   
+  14   PROC reopen_invoice(inv_id)
+  15     LOG "WRITE invoices SET status = open"   -- message only
+  16 >   WRITE invoices SET status = "open" WHERE id = inv_id
+  17   ENDPROC
+  18   
+  \`\`\`
+
+- \`customers/customers.tl:12\`, in \`merge_customers\`: table="customers"
+  \`\`\`
+   9   ENDPROC
+  10   
+  11   PROC merge_customers(a, b)
+  12 >   WRITE customers SET merged_into = a WHERE id = b
+  13     WRITE customer_audit SET event = "merge", ref = b
+  14   ENDPROC
+  15   
+  \`\`\`
+
+- \`customers/customers.tl:13\`, in \`merge_customers\`: table="customer_audit"
+  \`\`\`
+  10   
+  11   PROC merge_customers(a, b)
+  12     WRITE customers SET merged_into = a WHERE id = b
+  13 >   WRITE customer_audit SET event = "merge", ref = b
+  14   ENDPROC
+  15   
+  \`\`\`
+
+- \`customers/messages.tl:10\`, in \`mark_read\`: table="inbox"
+  \`\`\`
+   7   ENDPROC
+   8   
+   9   PROC mark_read(msg_id)
+  10 >   WRITE inbox SET read = 1 WHERE id = msg_id
+  11   ENDPROC
+  12   
+  \`\`\`
+
+- \`inventory/warehouse.tl:6\`, in \`reorder\`: table="purchase_orders"
+  \`\`\`
+   3   PROC reorder(product_id)
+   4     LOG "/*"; CALL sync_warehouse(product_id)
+   5     /* old: CALL legacy_reorder(product_id) */ CALL place_order(product_id)
+   6 >   WRITE purchase_orders SET product = product_id
+   7   ENDPROC
+   8   
+   9   PROC sync_warehouse(product_id)
+  \`\`\`
+
+- \`legacy/dos_export.tl:6\`, in \`export_orders\`: table="export_log"
+  \`\`\`
+   3   
+   4   PROC export_orders()
+   5     READ orders WHERE exported = 0
+   6 >   WRITE export_log SET n = ROWCOUNT()
+   7   ENDPROC
+   8   
+  \`\`\`
+
+- \`orders/orders.tl:19\`, in \`close_day\`: table="orders"
+  \`\`\`
+  16   PROC close_day()
+  17     WHILE pending > 0 DO
+  18       READ orders WHERE status = "open" INTO ord
+  19 >     WRITE orders SET status = "closed" WHERE id = ord_id
+  20       LET pending = pending - 1
+  21     ENDWHILE
+  22   ENDPROC
+  \`\`\`
+
+- \`reporting/month_end.tl:9\`, in \`close_month\`: table="ledger"
+  \`\`\`
+   6     if flag("month_end_v2") then
+   7       call post_accruals(current_period)
+   8     endif
+   9 >   write ledger set closed = 1 where period = current_period
+  10   endproc
+  11   
+  12   proc post_accruals(period)
+  \`\`\`
+
+- \`reporting/month_end.tl:13\`, in \`post_accruals\`: table="accruals"
+  \`\`\`
+  10   endproc
+  11   
+  12   proc post_accruals(period)
+  13 >   write accruals set period = period
+  14   endproc
+  15   
+  16   entry month_end->close_month
+  \`\`\`
+
+
+**Provenance**
+
+- \`skills/db-write.md\` § writing-a-table — examples: write-01, write-02, write-03, write-04, write-05, write-06, write-neg-01, write-neg-02, write-neg-03
+
+### \`config-flag\` (config_ref) — OK
+
+- Pattern: \`regex: /\\bFLAG\\s*\\(\\s*"(?<key>[^"]+)"\\s*\\)/i (per line)\`
+- Captures: key → key
+- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Pass rate (own examples): 100% (9/9)
+
+**Representative matches** (passed positive examples):
+
+- \`flag-01\` (config-flag): key="new_pricing"
+  location: config-flag.md:13 (example flag-01)
+  \`\`\`
+   1 > IF FLAG("new_pricing") THEN
+   2     LET rate = 0.9
+   3   ENDIF
+  \`\`\`
+
+- \`flag-02\` (config-flag): key="eu_vat"
+  location: config-flag.md:25 (example flag-02)
+  \`\`\`
+   1 > IF flag("eu_vat") AND FLAG("vat.v2") THEN
+   2     LET vat = 0.2
+   3   ENDIF
+  \`\`\`
+
+- \`flag-03\` (config-flag): key="beta-ui"
+  location: config-flag.md:40 (example flag-03)
+  \`\`\`
+   1 > LET beta = FLAG ( "beta-ui" )
+  \`\`\`
+
+- \`flag-04\` (config-flag): key="fast_shipping"
+  location: config-flag/flag-04.tl (example flag-04)
+  \`\`\`
+   1   PROC ship(oid)
+   2 >   IF FLAG("fast_shipping") THEN
+   3       IF FLAG("fast_shipping_eu") THEN
+   4         LET carrier = "dhl"
+  \`\`\`
+
+- \`flag-05\` (config-flag): key="legacy--mode"
+  location: config-flag/flag-05.tl (example flag-05)
+  \`\`\`
+   1 > LET legacy = FLAG("legacy--mode")
+  \`\`\`
+
+- \`flag-06\` (config-flag): key="audit"
+  location: config-flag/flag-06.tl (example flag-06)
+  \`\`\`
+   1 > LET x = FLAG("audit") -- FLAG("audit_v2") not yet
+  \`\`\`
+
+
+**Missed examples** (expected but not found):
+
+_None._
+
+**Wrong captures** (matched the right line, wrong values):
+
+_None._
+
+**False positives** (matched a negative example):
+
+_None._
+
+
+**Unreviewed sample matches** (9, run \`lsc review\` to label them):
+
+- \`admin/flags.tl:7\`, in \`check_flags\`: key="legacy--mode"
+  \`\`\`
+   4   
+   5   PROC check_flags(flag_name)
+   6     LET enabled = FLAG(flag_name)
+   7 >   LET legacy = FLAG("legacy--mode")
+   8     IF FLAG("audit") THEN -- FLAG("audit_v2") not yet
+   9       LOG "FLAG audit is on"
+  10     ENDIF
+  \`\`\`
+
+- \`admin/flags.tl:8\`, in \`check_flags\`: key="audit"
+  \`\`\`
+   5   PROC check_flags(flag_name)
+   6     LET enabled = FLAG(flag_name)
+   7     LET legacy = FLAG("legacy--mode")
+   8 >   IF FLAG("audit") THEN -- FLAG("audit_v2") not yet
+   9       LOG "FLAG audit is on"
+  10     ENDIF
+  11     LET FLAGSHIP_store = "berlin"
+  \`\`\`
+
+- \`billing/billing.tl:9\`, in \`calc_total\`: key="new_pricing"
+  \`\`\`
+   6   PROC calc_total(order_id)
+   7     READ orders WHERE id = order_id INTO ord
+   8     LET t = 0
+   9 >   IF FLAG("new_pricing") THEN
+  10       CALL apply_discount(order_id)
+  11       CALL rates.net_price(ord_amount) INTO t
+  12     ELSE
+  \`\`\`
+
+- \`billing/billing.tl:22\`, in \`apply_discount\`: key="stacked_discounts"
+  \`\`\`
+  19   PROC apply_discount(order_id)
+  20     READ discounts WHERE order_id = order_id
+  21     IF ROWCOUNT() > 0 THEN
+  22 >     IF FLAG("stacked_discounts") THEN
+  23         LOG "stacking discounts for " + order_id
+  24       ENDIF
+  25     ENDIF
+  \`\`\`
+
+- \`billing/rates.tl:6\`, in \`net_price\`: key="eu_vat"
+  \`\`\`
+   3   
+   4   FUNC net_price(amount) RETURNS NUMBER
+   5     LET vat = 0.2
+   6 >   IF FLAG("eu_vat") AND FLAG("vat.v2") THEN
+   7       READ vat_rates WHERE region = current_region INTO vat
+   8     ENDIF
+   9     RETURN amount * (1 + vat)
+  \`\`\`
+
+- \`billing/rates.tl:6\`, in \`net_price\`: key="vat.v2"
+  \`\`\`
+   3   
+   4   FUNC net_price(amount) RETURNS NUMBER
+   5     LET vat = 0.2
+   6 >   IF FLAG("eu_vat") AND FLAG("vat.v2") THEN
+   7       READ vat_rates WHERE region = current_region INTO vat
+   8     ENDIF
+   9     RETURN amount * (1 + vat)
+  \`\`\`
+
+- \`customers/customers.tl:6\`, in \`load_customer\`: key="vip-program"
+  \`\`\`
+   3   
+   4   PROC load_customer(cid)
+   5     read customers WHERE id = cid INTO cust
+   6 >   IF FLAG ( "vip-program" ) THEN
+   7       READ vip_benefits WHERE customer_id = cid
+   8     ENDIF
+   9   ENDPROC
+  \`\`\`
+
+- \`orders/orders.tl:8\`, in \`load_order\`: key="fast_shipping"
+  \`\`\`
+   5     READ orders WHERE id = order_id INTO ord
+   6     IF ord_status = "new" THEN
+   7       CALL billing.calc_total(order_id)
+   8 >     IF FLAG("fast_shipping") THEN
+   9         CALL shipping.book_express(order_id)
+  10       ELSE
+  11         CALL shipping.book_standard(order_id)
+  \`\`\`
+
+- \`reporting/month_end.tl:6\`, in \`close_month\`: key="month_end_v2"
+  \`\`\`
+   3   
+   4   proc close_month()
+   5     read ledger where period = current_period into led
+   6 >   if flag("month_end_v2") then
+   7       call post_accruals(current_period)
+   8     endif
+   9     write ledger set closed = 1 where period = current_period
+  \`\`\`
+
+
+**Provenance**
+
+- \`skills/config-flag.md\` § feature-flags — examples: flag-01, flag-02, flag-03, flag-04, flag-05, flag-06, flag-neg-01, flag-neg-02, flag-neg-03
+
+### \`entry-point\` (entry_point) — OK
+
+- Pattern: \`exact: ENTRY <token> -> (case-insensitive)\`
+- Captures: name → name
+- Confidence: **high** (declared: high) — high — 6/6 own positive and 3/3 own negative examples pass (100%), meeting the high threshold (≥5 positive, ≥2 negative, all passing)
+- Pass rate (own examples): 100% (9/9)
+
+**Representative matches** (passed positive examples):
+
+- \`entry-01\` (entry-point): name="nightly_billing"
+  location: entry-point.md:15 (example entry-01)
+  \`\`\`
+   1 > ENTRY nightly_billing -> calc_total
+  \`\`\`
+
+- \`entry-02\` (entry-point): name="month_end"
+  location: entry-point.md:25 (example entry-02)
+  \`\`\`
+   1 > entry month_end->close_month
+  \`\`\`
+
+- \`entry-03\` (entry-point): name="nightly_billing"
+  location: entry-point.md:35 (example entry-03)
+  \`\`\`
+   1 > ENTRY nightly_billing -> calc_total
+   2   ENTRY retry_billing   -> calc_total  -- rerun after failures
+  \`\`\`
+
+- \`entry-04\` (entry-point): name="nightly_billing"
+  location: entry-point/entry-04.tl (example entry-04)
+  \`\`\`
+   6   ENDPROC
+   7   
+   8 > ENTRY nightly_billing -> calc_total
+  \`\`\`
+
+- \`entry-05\` (entry-point): name="eod_orders"
+  location: entry-point/entry-05.tl (example entry-05)
+  \`\`\`
+   1 > ENTRY eod_orders -> orders.close_day
+  \`\`\`
+
+- \`entry-06\` (entry-point): name="weekly_report"
+  location: entry-point/entry-06.tl (example entry-06)
+  \`\`\`
+   1 > 	ENTRY	weekly_report	->	build_report
+  \`\`\`
+
+
+**Missed examples** (expected but not found):
+
+_None._
+
+**Wrong captures** (matched the right line, wrong values):
+
+_None._
+
+**False positives** (matched a negative example):
+
+_None._
+
+
+**Unreviewed sample matches** (7, run \`lsc review\` to label them):
+
+- \`batch/nightly.tl:15\`: name="nightly_all"
+  \`\`\`
+  12     LOG "cleanup"
+  13   ENDPROC
+  14   
+  15 > ENTRY nightly_all -> run_all
+  16   ENTRY nightly_billing_only -> billing.calc_total
+  17   
+  \`\`\`
+
+- \`batch/nightly.tl:16\`: name="nightly_billing_only"
+  \`\`\`
+  13   ENDPROC
+  14   
+  15   ENTRY nightly_all -> run_all
+  16 > ENTRY nightly_billing_only -> billing.calc_total
+  17   
+  \`\`\`
+
+- \`billing/billing.tl:34\`: name="nightly_billing"
+  \`\`\`
+  31     RETURN
+  32   ENDPROC
+  33   
+  34 > ENTRY nightly_billing -> calc_total
+  35   
+  \`\`\`
+
+- \`orders/orders.tl:24\`: name="eod_orders"
+  \`\`\`
+  21     ENDWHILE
+  22   ENDPROC
+  23   
+  24 > ENTRY eod_orders -> close_day
+  25   
+  \`\`\`
+
+- \`reporting/month_end.tl:16\`: name="month_end"
+  \`\`\`
+  13     write accruals set period = period
+  14   endproc
+  15   
+  16 > entry month_end->close_month
+  17   
+  \`\`\`
+
+- \`reporting/reports.tl:11\`: name="weekly_report"
+  \`\`\`
+   8     CALL common.log_event("report built")
+   9   ENDPROC
+  10   
+  11 > ENTRY weekly_report -> build_report
+  12   ENTRY daily_report  -> build_report
+  13   
+  \`\`\`
+
+- \`reporting/reports.tl:12\`: name="daily_report"
+  \`\`\`
+   9   ENDPROC
+  10   
+  11   ENTRY weekly_report -> build_report
+  12 > ENTRY daily_report  -> build_report
+  13   
+  \`\`\`
+
+
+**Provenance**
+
+- \`skills/entry-point.md\` § declaring-an-entry-point — examples: entry-01, entry-02, entry-03, entry-04, entry-05, entry-06, entry-neg-01, entry-neg-02, entry-neg-03
+
+
+## Sample-scan warnings
+
+- \`proc-definition\` unclosed-block at \`batch/retry.tl:4\`: scope opened by rule "proc-definition" at line 4 is never closed (end of file)
+- \`proc-definition\` unmatched-block-end at \`legacy/old_billing.tl:17\`: blockEnd of rule "proc-definition" at line 17 has no open scope of that rule
+
+## Provenance
+
+### Skill file hashes
+
+- \`skills/language-basics.md\` — sha256 \`d96e4e99404e5bcea7dfc580dd5ca36aea4c38fe3b09fe4fe973ec77fe55b469\`
+- \`skills/module.md\` — sha256 \`8726ba9efff6553b38536488a6b94ade71cdcec50ed76506de9550e49b04d426\`
+- \`skills/procedure.md\` — sha256 \`55994bb01a2f5dfc6d74d3846a958958ae55de8eebee4175106715047dcf7411\`
+- \`skills/call.md\` — sha256 \`b2e134f5075a6ef524d9d9924da4082b5b31ca3980a807141840dbb1369e91bd\`
+- \`skills/include.md\` — sha256 \`c2ffba25e7c1daf670b60c9a6b2a3474618da0d8467c0b2ec3e8dcdcf7317011\`
+- \`skills/db-read.md\` — sha256 \`51ee4a22f0c1f80c03bac0412ad260cdab4c60ae6e6262a5e03bf88394e65971\`
+- \`skills/db-write.md\` — sha256 \`45a60588788bbce069eb6b24566f5a7828749d7ff4aa16f24f0a8318d4b5a3fe\`
+- \`skills/config-flag.md\` — sha256 \`ea9696b64b82100786b84303cddf86cf1ead527c13d85c9ae8153c7b84ffc6c9\`
+- \`skills/entry-point.md\` — sha256 \`1f3d265af107947941089481aa3fec7d9c115e3857e99ef7dc4b4a9ef588140c\`
+
+"
+`;
