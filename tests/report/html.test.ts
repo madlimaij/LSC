@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildReport } from '../../src/report/build.js';
 import { renderHtml } from '../../src/report/html.js';
+import type { SynthesisReport } from '../../src/synth/index.js';
 import {
   brokenRuleSetWithAllThreeDefects,
   fixtureExamplesById,
@@ -9,6 +10,51 @@ import {
   loadSampleFiles,
   runFixture,
 } from './helpers.js';
+
+function fakeSynthesisWithHandWrittenModelSource(): SynthesisReport {
+  return {
+    languageId: 'toylang',
+    compilerVersion: '0.1.0',
+    generatedAt: '2026-09-26T00:00:00.000Z',
+    status: 'completed',
+    maxAttemptsPerConstruct: 3,
+    lexical: {
+      status: 'accepted',
+      settings: { fileMatchers: ['**/*.tl'] },
+      attempts: [
+        {
+          attempt: 1,
+          requestHash: 'a'.repeat(64),
+          outcome: 'unjustified-settings',
+          problems: ['line comment "//" does not appear in the documentation'],
+          usage: { inputTokens: 1, outputTokens: 1 },
+          proposal: { fileMatchers: ['**/*.tl'], lineComment: '//' },
+        },
+        {
+          attempt: 2,
+          requestHash: 'b'.repeat(64),
+          outcome: 'accepted',
+          problems: [],
+          usage: { inputTokens: 1, outputTokens: 1 },
+          proposal: { fileMatchers: ['**/*.tl'], lineComment: '--' },
+        },
+      ],
+    },
+    constructs: [],
+    summary: { constructs: 8, validated: 8, rejected: 0, notJustified: 0, skipped: 0, notAttempted: 0 },
+    usage: { inputTokens: 1, outputTokens: 1, calls: 1 },
+    ingestDiagnostics: [],
+    modelSource: {
+      mode: 'replay',
+      configuredProvider: 'fake',
+      provider: 'hand-written',
+      model: 'hand-written',
+      origin: 'hand-written',
+      calls: [{ origin: 'hand-written', provider: 'hand-written', model: 'hand-written', calls: 1 }],
+      summary: 'replay of hand-written recordings',
+    },
+  };
+}
 
 describe('renderHtml', () => {
   it('is a single self-contained HTML document: no external assets, no remote requests', () => {
@@ -155,5 +201,61 @@ describe('renderHtml', () => {
     const html = renderHtml(report);
     const dbRead = htmlRuleSection(html, 'db-read');
     expect(dbRead).not.toMatch(/<strong>high<\/strong>[^\n]*high — /);
+  });
+
+  // G2 round targeted review, finding (1): the html.ts counterpart of the markdown.ts fix — say no
+  // sample was scanned, not the unrelated "no rule has any unreviewed sample match".
+  it('says "No sample repository scanned" when no sample was scanned at all, not "no rule has any unreviewed sample match"', () => {
+    const results = runFixture();
+    const report = buildReport(results, { ruleSet: loadFixtureRuleSet(), examplesById: fixtureExamplesById() });
+    expect(report.overall.sampleScanned).toBe(false);
+    const html = renderHtml(report);
+    expect(html).toContain('No sample repository scanned.');
+    expect(html).not.toContain('no rule has any unreviewed sample match');
+  });
+
+  // G2 round targeted review, finding (2): assert on text unique to the verdict-area statement
+  // (`modelSourceWarningNearVerdictHtml`), not the Synthesis section's own sentence.
+  it('states "Not produced by a real model" specifically next to the Verdict, not only in the Synthesis section', () => {
+    const results = runFixture();
+    const report = buildReport(results, { synthesis: fakeSynthesisWithHandWrittenModelSource() });
+    const html = renderHtml(report);
+    const verdictSection = html.slice(html.indexOf('<div class="verdict-box'), html.indexOf('<h2>Coverage</h2>'));
+    expect(verdictSection).toContain('<strong>Not produced by a real model</strong>');
+    expect(verdictSection).toContain('Synthesis section below');
+  });
+
+  // G2 round targeted review, finding (3): assert on the *rendered* lexical proposal history text.
+  it('renders the lexical proposal history: each attempt, its outcome, and a refused attempt\'s reason', () => {
+    const results = runFixture();
+    const report = buildReport(results, { ruleSet: loadFixtureRuleSet(), synthesis: fakeSynthesisWithHandWrittenModelSource() });
+    const html = renderHtml(report);
+    expect(html).toContain('attempt 1: <strong>unjustified-settings</strong>');
+    expect(html).toContain('does not appear in the documentation');
+    expect(html).toContain('attempt 2: <strong>accepted</strong>');
+  });
+
+  // G2 round targeted review, finding (4a): the "Sample coverage shows matches only" bullet had no
+  // HTML test in either branch (scanned vs not scanned).
+  it('the "Sample coverage shows matches only" bullet states the sample-scanned branch correctly, in both states', () => {
+    const scanned = buildReport(runFixture(loadFixtureRuleSet(), loadSampleFiles()), { ruleSet: loadFixtureRuleSet() });
+    const scannedHtml = renderHtml(scanned);
+    expect(scannedHtml).toContain('Sample coverage shows matches only');
+    expect(scannedHtml).toContain('Misses in the sample must be found by reviewing it');
+
+    const notScanned = buildReport(runFixture(), { ruleSet: loadFixtureRuleSet() });
+    const notScannedHtml = renderHtml(notScanned);
+    expect(notScannedHtml).toContain('Sample coverage shows matches only');
+    expect(notScannedHtml).toContain('No sample repository was scanned at all here');
+  });
+
+  // G2 round targeted review, finding (4b): the HTML new-Skill-file block had no test at all.
+  it('the HTML new-Skill-file block warns about a Skill file present under --skills-dir but not in sourceSkills', () => {
+    const ruleSet = loadFixtureRuleSet();
+    const current = [...ruleSet.sourceSkills, { path: 'new-construct.md', sha256: 'c'.repeat(64) }];
+    const report = buildReport(runFixture(), { ruleSet, currentSourceSkills: current });
+    const html = renderHtml(report);
+    expect(html).toContain('new-construct.md');
+    expect(html).toContain('not used by this Rule Set');
   });
 });

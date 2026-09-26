@@ -3,9 +3,30 @@
 exports[`renderMarkdown > matches the snapshot for the healthy toylang fixture, with samples, ruleset and skills-dir 1`] = `
 "# Rule Set report — toylang 1.0.0
 
+## Summary
+
+This Rule Set was compiled for \`toylang\` from 8 language constructs described in the Skill files. 8 rules tested against the examples in the Skill files pass: \`module-declaration\`, \`proc-definition\`, \`call-statement\`, \`include-directive\`, \`db-read\`, \`db-write\`, \`config-flag\`, \`entry-point\`.
+138 matches found while scanning a sample repository still need review. This Rule Set can be used.
+
+**What to do next**
+
+- Review the 138 matches found in the sample repository: \`lsc review …\`.
+
 ## Verdict
 
+**VALIDATED**
+
+- 100% of own examples pass (74/74)
+- 138 sample matches not yet reviewed
+- all 8 validated rule(s) pass every own example at high or medium confidence
+
+_"Own examples", "cross-construct negatives" and the confidence thresholds are explained in the [glossary](#glossary) below._
+
+<details><summary>Full verdict line (unchanged wording, for tooling)</summary>
+
 **VALIDATED — 100% of own examples pass (74/74); 138 sample matches not yet reviewed; all 8 validated rule(s) pass every own example at high or medium confidence**
+
+</details>
 
 - Rule Set: \`toylang\` version \`1.0.0\` (compiled with lsc \`0.1.0\`, generated 2026-09-26T00:00:00.000Z)
 - Validated rules (high/medium confidence, own tests pass): 8
@@ -2090,6 +2111,13 @@ _Synthesis details unavailable (pass \`--synthesis <file>\` to \`lsc report\`)._
 - \`entry-point.md\` — sha256 \`1f3d265af107947941089481aa3fec7d9c115e3857e99ef7dc4b4a9ef588140c\`
 
 
+
+<a id="glossary"></a>
+## Glossary
+
+- **own examples** — the examples a rule's Skill file section cites as its evidence (docs/PLAN.md §6.1), as opposed to another construct's negative examples used only to catch a rule that is too eager.
+- **cross-construct negative** — a negative example that belongs to a *different* construct than the rule being tested; a rule that matches it anyway is too eager and is blocked from a validated confidence level regardless of its own pass rate.
+- **confidence thresholds** (docs/PLAN.md §6.3) — **high**: at least 5 positive and 2 negative examples, all passing. **medium**: at least 3 positive examples, at least a 90% pass rate, no failing negative example. **low**: anything else that still passes at least one positive example. **rejected**: passes no positive example, or ran out of refinement attempts while still failing.
 
 "
 `;

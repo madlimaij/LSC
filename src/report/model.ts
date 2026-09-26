@@ -210,11 +210,34 @@ export interface SkillHashMismatch {
   readonly currentSha256?: string;
 }
 
+/**
+ * The top-of-report summary (D28, owner readability pass): a plain-language verdict for a reader
+ * who is not a regex expert, before any of the detailed sections. Never repeats an internal
+ * reference (a decision id, a schema field name, "cross-construct negative", "own examples") —
+ * those stay in the detailed sections and the glossary; the summary says "tested against the
+ * examples in the Skill files" and similar instead.
+ */
+export interface Summary {
+  /**
+   * `'ready'`: nothing left to do (not a draft, verdict validated, nothing in `whatNext`).
+   * `'rejected'`: `overall.verdict` is `'rejected'`. `'action-needed'`: otherwise not ready yet
+   * (low confidence, a draft, unreviewed sample matches, hand-written answers, or Skill files that
+   * changed) — this is deliberately not the same three-way split as `overall.verdict` (a validated
+   * but still-draft Rule Set is amber here, not green: it is not yet usable).
+   */
+  readonly status: 'ready' | 'action-needed' | 'rejected';
+  /** One or two short paragraphs in plain language: what was compiled, what works, what does not, and whether it can be used yet. */
+  readonly paragraphs: readonly string[];
+  /** What to do next, in priority order; empty only when `status` is `'ready'`. */
+  readonly whatNext: readonly string[];
+}
+
 export interface Report {
   readonly languageId: string;
   readonly ruleSetVersion: string;
   readonly compilerVersion: string;
   readonly generatedAt: string;
+  readonly summary: Summary;
   readonly overall: OverallVerdict;
   readonly coverage: readonly CoverageRow[];
   readonly constructCoverage: readonly CoverageConstruct[];

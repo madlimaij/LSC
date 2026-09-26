@@ -365,7 +365,11 @@ function confidenceReasonPointer(row: Report['coverage'][number]): string {
 function renderSampleMatchCounts(report: Report): string {
   const rows = report.rules.filter((rule) => rule.sampleMatches.length > 0);
   if (rows.length === 0) {
-    return `<p class="muted">None (no rule has any unreviewed sample match).</p>`;
+    // G2 round follow-up: distinguish "scanned and found nothing" from "nothing scanned at all" —
+    // the same fix as markdown.ts's renderSampleMatchCounts.
+    return report.overall.sampleScanned
+      ? `<p class="muted">None (no rule has any unreviewed sample match).</p>`
+      : `<p class="muted">No sample repository scanned.</p>`;
   }
   const body = rows
     .map(
@@ -389,6 +393,65 @@ function renderCoverage(report: Report): string {
   return `<table><thead><tr><th>Rule type</th><th>Status</th><th>Confidence</th><th>Rule(s)</th><th>Confidence reason</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+/**
+ * D28 (owner readability pass): the Summary panel, before everything else — a boxed, colour-coded
+ * panel (green ready to use, red rejected, amber something is still left to do) so a reader who is
+ * not a regex expert knows within a few lines whether this Rule Set can be trusted. All CSS is
+ * inline (`STYLE` below); no new external asset.
+ */
+function renderSummary(report: Report): string {
+  const paragraphs = report.summary.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('');
+  const whatNext =
+    report.summary.whatNext.length > 0
+      ? `<ul>${report.summary.whatNext.map((item) => `<li>${escCode(item)}.</li>`).join('')}</ul>`
+      : `<p>Nothing &mdash; this Rule Set is ready to use.</p>`;
+  return `
+<div class="summary-box summary-${esc(report.summary.status)}">
+  ${paragraphs}
+  <h3>What to do next</h3>
+  ${whatNext}
+</div>`;
+}
+
+/**
+ * D28: the jargon the detailed sections below still use, explained once near the end, linked from
+ * the Verdict's "how to read this report" note.
+ */
+function renderGlossary(): string {
+  return `
+<h2 id="glossary">Glossary</h2>
+<ul>
+  <li><strong>own examples</strong> &mdash; the examples a rule's Skill file section cites as its evidence (docs/PLAN.md &sect;6.1), as opposed to another construct's negative examples used only to catch a rule that is too eager.</li>
+  <li><strong>cross-construct negative</strong> &mdash; a negative example that belongs to a <em>different</em> construct than the rule being tested; a rule that matches it anyway is too eager and is blocked from a validated confidence level regardless of its own pass rate.</li>
+  <li><strong>confidence thresholds</strong> (docs/PLAN.md &sect;6.3) &mdash; <strong>high</strong>: at least 5 positive and 2 negative examples, all passing. <strong>medium</strong>: at least 3 positive examples, at least a 90% pass rate, no failing negative example. <strong>low</strong>: anything else that still passes at least one positive example. <strong>rejected</strong>: passes no positive example, or ran out of refinement attempts while still failing.</li>
+</ul>`;
+}
+
+/**
+ * D28: the verdict used to be one long bold sentence; now a short status word plus one bullet per
+ * clause (same facts, from the same `overall` fields `renderVerdict`'s single-string `overall.summary`
+ * was built from — nothing dropped, `overall.summary` itself is unchanged for the JSON format).
+ */
+function verdictStatusWord(overall: Report['overall']): string {
+  return overall.verdict === 'validated' ? 'VALIDATED' : overall.verdict === 'low-confidence' ? 'LOW CONFIDENCE' : 'REJECTED';
+}
+
+function verdictBullets(report: Report): string[] {
+  const { overall } = report;
+  const totalOwnPassed = report.rules.reduce((s, r) => s + r.testsPassed, 0);
+  const passRatePct = Math.round(overall.examplePassRate * 1000) / 10;
+  const sampleMatchesClause = !overall.sampleScanned
+    ? 'no sample repository scanned'
+    : overall.unreviewedSampleMatchCount === 0
+      ? 'no unreviewed sample matches'
+      : `${String(overall.unreviewedSampleMatchCount)} sample match${overall.unreviewedSampleMatchCount === 1 ? '' : 'es'} not yet reviewed`;
+  return [
+    `${String(passRatePct)}% of own examples pass (${String(totalOwnPassed)}/${String(overall.totalOwnExamples)})`,
+    sampleMatchesClause,
+    ...overall.reasons,
+  ];
+}
+
 const STYLE = `
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem auto; max-width: 60rem; line-height: 1.45; color: #1a1a1a; }
   h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
@@ -402,6 +465,11 @@ const STYLE = `
   .verdict-validated { border-color: #1a7f37; background: #eaffef; }
   .verdict-low-confidence { border-color: #9a6700; background: #fff8e6; }
   .verdict-rejected { border-color: #b31d28; background: #ffecec; }
+  .summary-box { padding: 1.2rem 1.4rem; border-radius: .5rem; border: 2px solid; margin: 1rem 0 2rem; }
+  .summary-box h3 { margin-top: 1rem; margin-bottom: .3rem; }
+  .summary-ready { border-color: #1a7f37; background: #eaffef; }
+  .summary-action-needed { border-color: #9a6700; background: #fff8e6; }
+  .summary-rejected { border-color: #b31d28; background: #ffecec; }
   .rule { border: 1px solid #ddd; border-radius: .4rem; padding: 1rem 1.2rem; margin: 1.2rem 0; }
   .rule.defect { border-color: #b31d28; }
   .rule.ok { border-color: #1a7f37; }
@@ -438,8 +506,15 @@ export function renderHtml(report: Report): string {
 <body>
 <h1>Rule Set report &mdash; ${esc(report.languageId)} ${esc(report.ruleSetVersion)}</h1>
 
+${renderSummary(report)}
+
 <div class="verdict-box verdict-${esc(overall.verdict)}">
-  <p><strong>${esc(overall.summary)}</strong></p>
+  <p><strong>${esc(verdictStatusWord(overall))}</strong></p>
+  <ul>
+    ${verdictBullets(report).map((bullet) => `<li>${escCode(bullet)}</li>`).join('')}
+  </ul>
+  <p class="muted">"Own examples", "cross-construct negatives" and the confidence thresholds are explained in the <a href="#glossary">glossary</a> below.</p>
+  <details><summary>Full verdict line (unchanged wording, for tooling)</summary><p><strong>${esc(overall.summary)}</strong></p></details>
   ${draftWarningHtml(report)}
   ${modelSourceWarningNearVerdictHtml(report)}
   <ul>
@@ -480,6 +555,8 @@ ${renderSynthesis(report)}
 ${renderSourceSkills(report)}
 ${renderSkillHashMismatches(report)}
 ${renderNewSkillFiles(report)}
+
+${renderGlossary()}
 
 </body>
 </html>

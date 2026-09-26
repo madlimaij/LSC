@@ -28,6 +28,7 @@ import type {
 import { describeCaptures, describePattern } from './pattern.js';
 import { isRuleOk } from './rule-status.js';
 import { findNewSkillFiles, findSkillHashMismatches, type SourceSkillLike } from './skill-hash-check.js';
+import { buildSummary } from './summary.js';
 import { buildSynthesisView } from './synthesis-view.js';
 
 export interface BuildReportOptions {
@@ -279,7 +280,7 @@ export function buildReport(results: Results, options: BuildReportOptions = {}):
   const coverage = buildCoverage(rules);
   const overall = buildOverallVerdict(results, rules);
 
-  return {
+  const withoutSummary: Omit<Report, 'summary'> = {
     languageId: results.languageId,
     ruleSetVersion: results.ruleSetVersion,
     compilerVersion: results.compilerVersion,
@@ -299,4 +300,6 @@ export function buildReport(results: Results, options: BuildReportOptions = {}):
         }
       : {}),
   };
+
+  return { ...withoutSummary, summary: buildSummary(withoutSummary) };
 }

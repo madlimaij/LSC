@@ -17,6 +17,38 @@ import type {
 } from './model.js';
 import { reasonWithoutLeadingLevel } from './confidence-reason.js';
 
+/**
+ * D28 (owner readability pass): the Summary, before everything else — plain language, no internal
+ * references, so a reader who is not a regex expert knows within a few lines whether this Rule Set
+ * can be trusted and what to do next. `report.summary` (`summary.ts`) already worked out the wording;
+ * this only lays it out.
+ */
+function renderSummary(report: Report): string {
+  const lines = ['## Summary', '', ...report.summary.paragraphs, ''];
+  if (report.summary.whatNext.length > 0) {
+    lines.push('**What to do next**', '', ...report.summary.whatNext.map((item) => `- ${item}.`));
+  } else {
+    lines.push('**What to do next**', '', 'Nothing — this Rule Set is ready to use.');
+  }
+  return lines.join('\n');
+}
+
+/**
+ * D28: the jargon the detailed sections below still use ("own examples", "cross-construct
+ * negatives", the confidence thresholds), explained once, near the end, so the Summary and Verdict
+ * above never have to define them inline.
+ */
+function renderGlossary(): string {
+  return [
+    '<a id="glossary"></a>',
+    '## Glossary',
+    '',
+    "- **own examples** — the examples a rule's Skill file section cites as its evidence (docs/PLAN.md §6.1), as opposed to another construct's negative examples used only to catch a rule that is too eager.",
+    '- **cross-construct negative** — a negative example that belongs to a *different* construct than the rule being tested; a rule that matches it anyway is too eager and is blocked from a validated confidence level regardless of its own pass rate.',
+    '- **confidence thresholds** (docs/PLAN.md §6.3) — **high**: at least 5 positive and 2 negative examples, all passing. **medium**: at least 3 positive examples, at least a 90% pass rate, no failing negative example. **low**: anything else that still passes at least one positive example. **rejected**: passes no positive example, or ran out of refinement attempts while still failing.',
+  ].join('\n');
+}
+
 function captureText(captures: Readonly<Record<string, string | undefined>>): string {
   const entries = Object.entries(captures).filter((entry): entry is [string, string] => entry[1] !== undefined);
   if (entries.length === 0) return '(none)';
@@ -52,12 +84,53 @@ function modelSourceWarningNearVerdict(report: Report): string | undefined {
   );
 }
 
+/**
+ * D28 (owner readability pass): the verdict used to be one long bold sentence ("REJECTED — 96.9% of
+ * own examples pass (63/65); 109 sample matches not yet reviewed; ..."). Splitting it into a short
+ * status word plus one bullet per clause keeps every fact (nothing here is dropped — `overall.reasons`
+ * is rendered in full) but lets a reader stop after the first bullet that worries them, instead of
+ * parsing one run-on sentence. `overall.summary` itself is unchanged (JSON output, and existing tests
+ * that check for "VALIDATED"/"REJECTED" substrings, both still work).
+ */
+function verdictStatusWord(overall: Report['overall']): string {
+  return overall.verdict === 'validated' ? 'VALIDATED' : overall.verdict === 'low-confidence' ? 'LOW CONFIDENCE' : 'REJECTED';
+}
+
+function verdictBullets(report: Report): string[] {
+  const { overall } = report;
+  const totalOwnPassed = report.rules.reduce((s, r) => s + r.testsPassed, 0);
+  const passRatePct = Math.round(overall.examplePassRate * 1000) / 10;
+  const sampleMatchesClause = !overall.sampleScanned
+    ? 'no sample repository scanned'
+    : overall.unreviewedSampleMatchCount === 0
+      ? 'no unreviewed sample matches'
+      : `${String(overall.unreviewedSampleMatchCount)} sample match${overall.unreviewedSampleMatchCount === 1 ? '' : 'es'} not yet reviewed`;
+  return [
+    `${String(passRatePct)}% of own examples pass (${String(totalOwnPassed)}/${String(overall.totalOwnExamples)})`,
+    sampleMatchesClause,
+    ...overall.reasons,
+  ];
+}
+
 function renderVerdict(report: Report): string {
   const { overall } = report;
   const lines = [
     `## Verdict`,
     '',
+    `**${verdictStatusWord(overall)}**`,
+    '',
+    ...verdictBullets(report).map((bullet) => `- ${bullet}`),
+    '',
+    '_"Own examples", "cross-construct negatives" and the confidence thresholds are explained in the [glossary](#glossary) below._',
+    '',
+    // The single bold sentence this replaced is kept, collapsed, exactly as before: `lsc compile`
+    // (tests/synth/compile-cli.test.ts, outside this package) still parses it verbatim out of the
+    // report it writes, and the JSON format's `overall.summary` field is unchanged either way.
+    '<details><summary>Full verdict line (unchanged wording, for tooling)</summary>',
+    '',
     `**${overall.summary}**`,
+    '',
+    '</details>',
     '',
     ...(draftWarning(report) !== undefined ? [draftWarning(report) as string, ''] : []),
     ...(modelSourceWarningNearVerdict(report) !== undefined ? [modelSourceWarningNearVerdict(report) as string, ''] : []),
@@ -119,7 +192,10 @@ function renderSampleMatchCounts(report: Report): string {
     .filter((rule) => rule.sampleMatches.length > 0)
     .map((rule) => `| [\`${rule.ruleId}\`](#rule-${rule.ruleId}) | ${rule.type} | ${String(rule.sampleMatches.length)} |`);
   if (rows.length === 0) {
-    return ['## Unreviewed sample matches per rule', '', '_None (no rule has any unreviewed sample match)._'].join('\n');
+    // G2 round follow-up: "no rule has any unreviewed sample match" reads as good news, but when no
+    // sample was scanned at all there is nothing to report either way — say which one it is.
+    const message = report.overall.sampleScanned ? '_None (no rule has any unreviewed sample match)._' : '_No sample repository scanned._';
+    return ['## Unreviewed sample matches per rule', '', message].join('\n');
   }
   return [
     '## Unreviewed sample matches per rule',
@@ -404,6 +480,8 @@ export function renderMarkdown(report: Report): string {
   const sections = [
     `# Rule Set report — ${report.languageId} ${report.ruleSetVersion}`,
     '',
+    renderSummary(report),
+    '',
     renderVerdict(report),
     '',
     renderCoverage(report),
@@ -429,6 +507,8 @@ export function renderMarkdown(report: Report): string {
     renderSourceSkills(report),
     renderSkillHashMismatches(report),
     renderNewSkillFiles(report),
+    '',
+    renderGlossary(),
     '',
   ];
   return `${sections.join('\n')}\n`;

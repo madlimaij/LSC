@@ -14,5 +14,6 @@ export * from './match-span.js';
 export * from './review-session.js';
 export * from './synthesis-view.js';
 export * from './skill-hash-check.js';
+export * from './summary.js';
 export * from './render-files.js';
 export * from './load-results.js';
