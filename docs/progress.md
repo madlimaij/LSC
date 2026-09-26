@@ -12,7 +12,7 @@
 | WP-07 | Report + review CLI | report-builder | WP-05 | done (G2 approved) |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | done (reviewed wave 3, round 2); real run deferred to G4 (D25) |
-| WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | wave 4 review: 2 findings (F1, F2), fixes in progress |
+| WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | done (reviewed wave 4, round 2) |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
 | WP-12 | Extra engines (conditional) | engine-builder | WP-11 | not started |
 
@@ -611,3 +611,26 @@ Small follow-up to WP-07/WP-10: shows `synthesis.json`'s new recompile fields (`
 
 **Open questions**
 - None new. The two prior open questions in the WP-10 note above (constructs rejected/not-justified last time always re-synthesised; a lexical change does not force construct re-synthesis) are unaffected by this follow-up — it only changes how the existing fields are displayed.
+
+### WP-10 review round 1 fixes F1/F2 (`contract-architect`, `llm-integrator`, 2026-09-26)
+
+*(Written by the orchestrator. The agents were told not to write to docs/progress.md during this round, so their notes came back as messages. The wave 4 round-2 review, finding F3, asked for this note.)*
+
+**Who made what:**
+- `926e52d` by `contract-architect`: `src/release/export.ts` (new exported `checkExportTarget(outPath, previousPath?)`; `exportFiles` checks the target and the CHANGELOG before writing and passes the full draft to the diff), `src/release/changelog.ts` (`findChangelogEntry`), `src/release/diff.ts` ("removed (rejected in the new draft; <type>)"), `src/release/README.md`, `tests/release/export-files.test.ts` (new, 13 tests).
+- `6d26af1` by `llm-integrator` (owner of `src/cli/commands/compile.ts` as the WP-09 command, D31 e): `compile.ts` calls src/release `checkExportTarget(--export, --previous)` right after `loadPrevious`, before the recording guard, session creation or any model call. The local check was renamed `checkCompileOutputs` and now only rejects `--export` pointing at compile's own outputs. `tests/synth/recompile-cli.test.ts` has a new test.
+
+**Findings**
+- **F1 (stale `--previous` overwrote a newer export): fixed.**
+  - `export-files.test.ts` › "reproduction: --out holds 2.1.0, --previous is 1.0.0: lsc export exits 1…", the `checkExportTarget` cases, and "re-deriving 2.0.0 from a restored 1.0.0 with different rules is refused; re-exporting the same 2.0.0 is idempotent".
+  - `recompile-cli.test.ts` › "refuses a stale --previous before any model call…" (no provider request, no snippet log, files unchanged).
+  - Verified by the reviewer end to end, including a normal 1.0.0 → 1.0.1 → 2.0.0 → 2.1.0 chain and idempotent re-exports.
+- **F2 (CHANGELOG did not say a removed rule was rejected): fixed.** `export-files.test.ts` › "exportFiles: the written CHANGELOG carries the same wording", plus the `exportRuleSet` test. The reviewer's wp09-reject export reads "`call`: removed (rejected in the new draft; call)".
+- Checks: `npm run typecheck` and `npm run lint` clean; `npm test` 71 files, 753 tests (orchestrator re-ran).
+
+**Deviations:**
+- The target check needs full content equality between `--out` and `--previous`, which is stricter than the same version alone.
+- In `lsc compile --export`, the CHANGELOG-conflict check runs inside `exportFiles`, after the model calls. That case is still refused and writes nothing; only the stale-`--out` case is caught before any model call.
+- "An existing --export without --previous" now reports through the ExportError handler (`ERROR: --export: …`).
+
+**Open questions:** None new.
