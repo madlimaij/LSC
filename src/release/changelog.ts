@@ -74,3 +74,18 @@ export function prependChangelogEntry(existing: string | undefined, entry: strin
   }
   return { text: `${CHANGELOG_TITLE}\n\n${entry}\n${normalized}`, added: true };
 }
+
+/**
+ * The entry headed `heading` in a CHANGELOG text (from its heading line up to
+ * the next `## ` heading or the end, trailing blank lines removed), or
+ * undefined when there is none.
+ */
+export function findChangelogEntry(text: string | undefined, heading: string): string | undefined {
+  if (text === undefined) return undefined;
+  const lines = text.split('\n');
+  const start = lines.findIndex((line) => line === heading || line.startsWith(`${heading} `));
+  if (start < 0) return undefined;
+  let end = lines.findIndex((line, i) => i > start && line.startsWith('## '));
+  if (end < 0) end = lines.length;
+  return `${lines.slice(start, end).join('\n').replace(/\s+$/, '')}\n`;
+}

@@ -11,13 +11,13 @@
  *   returned as it is (same version, same bytes), so one version always
  *   means one content.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { CONTRACT_VERSION, formatIssue, validateRuleSet, type RuleSet } from '../contract/index.js';
 import { loadRuleSetFile } from '../contract/load.js';
-import { entryHeading, prependChangelogEntry, renderChangelogEntry } from './changelog.js';
+import { entryHeading, findChangelogEntry, prependChangelogEntry, renderChangelogEntry } from './changelog.js';
 import { isReleaseVersion, nextVersion } from './content-version.js';
-import { diffRuleSets, type RuleSetDiff } from './diff.js';
+import { canonicalJson, diffRuleSets, type RuleSetDiff } from './diff.js';
 
 export class ExportError extends Error {
   override readonly name = 'ExportError';
@@ -77,7 +77,9 @@ export function exportRuleSet(input: ExportInput): ExportResult {
   }
 
   const candidate: RuleSet = { ...draft, contractVersion: CONTRACT_VERSION, rules: validated };
-  const diff = diffRuleSets(previous, candidate);
+  // The diff gets the full draft: it compares only validated rules anyway, and it needs the
+  // rejected ones to say "removed (rejected in the new draft)" in the CHANGELOG.
+  const diff = diffRuleSets(previous, { ...draft, contractVersion: CONTRACT_VERSION });
 
   if (previous !== undefined && diff.bump === 'none') {
     return { ruleSet: previous, version: previous.version, previousVersion: previous.version, diff, droppedRejected, unchanged: true };
@@ -124,7 +126,7 @@ export interface ExportFilesOptions {
 export interface ExportFilesResult extends ExportResult {
   readonly outPath: string;
   readonly changelogPath: string;
-  /** False when the CHANGELOG already had this version's entry, or nothing changed. */
+  /** False when the CHANGELOG already had this exact entry, or nothing changed. A different entry for the same version is refused. */
   readonly changelogUpdated: boolean;
 }
 
@@ -140,6 +142,57 @@ function loadRuleSet(path: string, what: string): RuleSet {
   throw new ExportError(`${what}: ${path} is not a valid Rule Set:\n${loaded.issues.map((i) => `  ${formatIssue(i)}`).join('\n')}`);
 }
 
+function samePath(a: string, b: string): boolean {
+  if (resolve(a) === resolve(b)) return true;
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Refuses an export target that would lose or contradict a delivered version
+ * (D31 b, D30 b). Checks only files that exist before the export, so
+ * `lsc compile --export` can call it before any model call.
+ *
+ * - `outPath` does not exist: nothing to check.
+ * - `outPath` exists and `previousPath` is undefined: refused (a forgotten
+ *   `--previous` would restart at 1.0.0 and overwrite a later version).
+ * - `outPath` exists and is the `previousPath` file itself: fine.
+ * - `outPath` exists and is another file: it must be a valid Rule Set with
+ *   the same content as `previousPath` (key order and whitespace ignored);
+ *   otherwise refused, because the export would overwrite a different, maybe
+ *   newer, version with one derived from a stale `--previous`.
+ *
+ * Does not validate `previousPath` as an exported Rule Set beyond loading it;
+ * `exportRuleSet` does that. Throws `ExportError`.
+ */
+export function checkExportTarget(outPath: string, previousPath?: string): void {
+  if (!existsSync(outPath)) return;
+  if (previousPath === undefined) {
+    throw new ExportError(
+      `${outPath} already exists; pass --previous <file> (normally that same file) so the new version is derived from it, or remove it to start again at 1.0.0`,
+    );
+  }
+  if (samePath(outPath, previousPath)) return;
+  const previous = loadRuleSet(previousPath, 'previous Rule Set');
+  const loaded = loadRuleSetFile(outPath);
+  if (!loaded.ok) {
+    throw new ExportError(`${outPath} already exists and is not a valid Rule Set; refusing to overwrite it (remove it, or choose another --out)`);
+  }
+  const existing = loaded.ruleSet;
+  if (canonicalJson(existing) !== canonicalJson(previous)) {
+    const what =
+      existing.languageId !== previous.languageId || existing.version !== previous.version
+        ? `holds ${existing.languageId} ${existing.version}, but --previous ${previousPath} is ${previous.languageId} ${previous.version}`
+        : `holds ${existing.languageId} ${existing.version} with content different from --previous ${previousPath}`;
+    throw new ExportError(
+      `${outPath} ${what}; the export would overwrite it with a version derived from a stale --previous. Pass --previous ${outPath} (the file being replaced), or choose another --out`,
+    );
+  }
+}
+
 /** Reads the inputs, exports, writes the Rule Set and prepends the CHANGELOG entry. Shared by `lsc export` and `lsc compile --export`. */
 export function exportFiles(options: ExportFilesOptions): ExportFilesResult {
   const outPath = resolve(options.outPath);
@@ -148,28 +201,32 @@ export function exportFiles(options: ExportFilesOptions): ExportFilesResult {
     throw new ExportError('--out must not be the draft file itself');
   }
   if (changelogPath === outPath) throw new ExportError('the CHANGELOG path must differ from --out');
-  if (options.previousPath === undefined && existsSync(outPath)) {
-    throw new ExportError(
-      `${options.outPath} already exists; pass --previous <file> (normally that same file) so the new version is derived from it, or remove it to start again at 1.0.0`,
-    );
-  }
+  checkExportTarget(outPath, options.previousPath);
 
   const draft = typeof options.draft === 'string' ? loadRuleSet(options.draft, 'draft') : options.draft;
   const previous = options.previousPath !== undefined ? loadRuleSet(options.previousPath, 'previous Rule Set') : undefined;
   const result = exportRuleSet({ draft, ...(previous !== undefined ? { previous } : {}) });
 
-  mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, `${JSON.stringify(result.ruleSet, null, 2)}\n`, 'utf8');
-
-  let changelogUpdated = false;
+  // CHANGELOG first, before anything is written: one version must never have two different entries (D31 a, D30 b).
+  let changelogText: string | undefined;
   if (result.changelogEntry !== undefined) {
     const existing = existsSync(changelogPath) ? readFileSync(changelogPath, 'utf8') : undefined;
-    const { text, added } = prependChangelogEntry(existing, result.changelogEntry, entryHeading(result.ruleSet.languageId, result.version));
-    if (added) {
-      mkdirSync(dirname(changelogPath), { recursive: true });
-      writeFileSync(changelogPath, text, 'utf8');
-      changelogUpdated = true;
+    const heading = entryHeading(result.ruleSet.languageId, result.version);
+    const present = findChangelogEntry(existing, heading);
+    if (present !== undefined && present !== result.changelogEntry) {
+      throw new ExportError(
+        `${changelogPath} already has an entry for ${result.ruleSet.languageId} ${result.version} with different content, so ${result.version} was already exported with other rules; ` +
+          `pass the Rule Set of the latest exported version as --previous`,
+      );
     }
+    if (present === undefined) changelogText = prependChangelogEntry(existing, result.changelogEntry, heading).text;
   }
-  return { ...result, outPath, changelogPath, changelogUpdated };
+
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, `${JSON.stringify(result.ruleSet, null, 2)}\n`, 'utf8');
+  if (changelogText !== undefined) {
+    mkdirSync(dirname(changelogPath), { recursive: true });
+    writeFileSync(changelogPath, changelogText, 'utf8');
+  }
+  return { ...result, outPath, changelogPath, changelogUpdated: changelogText !== undefined };
 }

@@ -21,7 +21,8 @@ lsc export <draft-ruleset> --out <file> [--previous <file>] [--changelog <file>]
 - Keeps only `validated` rules; the draft's `rejected` rules are listed as "not exported" (D25 item 5).
 - `version`: `1.0.0` without `--previous`; otherwise the previous version bumped by the diff (§3). Nothing changed: the previous file is written back unchanged, same version, no CHANGELOG entry.
 - `contractVersion` is set to the current `CONTRACT_VERSION`; `compiledAt` and `compilerVersion` stay as the draft has them (the compile that produced the rules).
-- Refuses: an invalid draft; a draft with no validated rule; a `--previous` that is a draft (pre-release or 0.x version), contains rejected rules, or is for another language; an existing `--out` without `--previous` (so a forgotten `--previous` cannot silently restart at `1.0.0`); `--out` equal to the draft.
+- Refuses: an invalid draft; a draft with no validated rule; a `--previous` that is a draft (pre-release or 0.x version), contains rejected rules, or is for another language; an existing `--out` without `--previous` (so a forgotten `--previous` cannot silently restart at `1.0.0`); `--out` equal to the draft; an existing `--out` that is not the `--previous` file and does not have the same content as `--previous` (a stale `--previous` would overwrite a newer version with a lower one); an existing `--out` that is not a Rule Set; a computed version whose CHANGELOG heading already exists with a different entry (an identical entry is left as it is). Nothing is written when an export is refused.
+- `checkExportTarget(outPath, previousPath?)` runs the `--out` / `--previous` checks alone, using only files that exist before the export, so `lsc compile --export` can call it before any model call.
 - CHANGELOG: default `CHANGELOG.md` next to `--out`; entries are headed `## <languageId> <version> (<date of compiledAt>)`.
 - Exit code 0 on success, 1 on any refusal (message on stderr).
 

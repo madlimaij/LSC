@@ -288,7 +288,7 @@ export function diffRuleSets(previous: RuleSet | undefined, next: RuleSet): Rule
         kind: 'rule-removed',
         bump: 'major',
         ruleId: r.id,
-        summary: `\`${r.id}\`: removed (${r.type})${rejected ? '; it is `rejected` in the new draft' : ''}`,
+        summary: rejected ? `\`${r.id}\`: removed (rejected in the new draft; ${r.type})` : `\`${r.id}\`: removed (${r.type})`,
       });
     }
   }
