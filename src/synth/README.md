@@ -92,7 +92,24 @@ lsc compile <skills-dir> [--sample <dir>] [--provider <name>] [--recordings <dir
 Writes to `--out` (default `.lsc/out`): `<languageId>.ruleset.draft.json`,
 `results.json` (runner `Results`, WP-05 schema, readable by `lsc report`),
 `synthesis.json` (`SynthesisReportSchema`: per construct and attempt, outcome,
-problems, drafts, token usage). Prints the `lsc report` command for WP-07.
+problems, drafts, token usage, and `modelSource`), and, when there is a draft
+Rule Set, the report `report.md` and `report.html` (WP-07 `renderReportFiles`,
+built from the draft, the ingested examples, `results.json` and
+`synthesis.json`; D25 item 2). The summary prints every path written and the
+verdict line. Without a draft (lexical settings failed, or aborted before
+them) no report is written and the summary says so.
+
+`modelSource` (`model-source.ts`, D25 item 2): `mode` (`live`,
+`live-recording`, `replay`), `configuredProvider`, `provider`, `model`,
+`origin` (`live`, `recorded`, `hand-written`, `mixed`, `none`), `calls`
+(successful calls grouped by origin/provider/model, with counts) and a
+one-line `summary`. Live runs take provider and model from the configuration;
+replays take them from the recordings actually used (matched by each
+attempt's `requestHash`). Optional in the schema only so older files parse.
+
+A construct's one-line `reason` withholds a failing review example's details
+(`summaryProblem`: id and `[review example]` tag only); the full failure line
+stays in that attempt's `problems`, which the report redacts itself.
 Exit code 0: every construct validated; 2: finished with rejected,
 not-justified or skipped constructs; 1: no usable result (no provider,
 refused recording, lexical settings failed, compile aborted).

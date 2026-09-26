@@ -3,7 +3,7 @@
  * hand-written recordings in fixtures/recordings/wp09 and wp09-reject (see
  * tests/synth/wp09-recordings.ts). WP-09 acceptance criteria 1–4.
  */
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { RULE_TYPES, validateRuleSet, type RuleSet } from '../../src/contract/index.js';
@@ -20,6 +20,9 @@ interface Outputs {
   ruleSet?: RuleSet;
   results?: Results;
   synthesis: SynthesisReport;
+  /** report.md / report.html written by `lsc compile` (D25 item 2), when present. */
+  reportMd?: string;
+  reportHtml?: string;
 }
 
 async function compile(scenario: 'wp09' | 'wp09-reject', ...extra: string[]): Promise<Outputs> {
@@ -47,7 +50,32 @@ async function compile(scenario: 'wp09' | 'wp09-reject', ...extra: string[]): Pr
     ...(existsSync(draft) ? { ruleSet: read('toylang.ruleset.draft.json') as RuleSet } : {}),
     ...(existsSync(join(out, 'results.json')) ? { results: ResultsSchema.parse(read('results.json')) } : {}),
     synthesis: SynthesisReportSchema.parse(read('synthesis.json')),
+    ...(existsSync(join(out, 'report.md')) ? { reportMd: readFileSync(join(out, 'report.md'), 'utf8') } : {}),
+    ...(existsSync(join(out, 'report.html')) ? { reportHtml: readFileSync(join(out, 'report.html'), 'utf8') } : {}),
   };
+}
+
+/** The HTML renderer escapes quotes and ampersands; compare against the escaped form. */
+function htmlEscaped(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** The Markdown report's `## Synthesis` section alone. */
+function synthesisSection(md: string): string {
+  const start = md.indexOf('\n## Synthesis\n');
+  expect(start).toBeGreaterThan(-1);
+  const end = md.indexOf('\n## ', start + 1);
+  return md.slice(start, end === -1 ? undefined : end);
+}
+
+/** Every construct's outcome line appears in both report files. */
+function expectEveryOutcome(res: Outputs): void {
+  const md = synthesisSection(res.reportMd ?? '');
+  for (const c of res.synthesis.constructs) {
+    expect(md).toContain(`- \`${c.constructId}\``);
+    expect(md).toMatch(new RegExp(`- \`${c.constructId}\`[^\n]*\\*\\*${c.status}\\*\\*[^\n]*${String(c.attempts.length)} attempt\\(s\\)`));
+    expect(res.reportHtml).toMatch(new RegExp(`<code>${c.constructId}</code>[^<]*&mdash; <strong>${c.status}</strong>`));
+  }
 }
 
 describe('lsc compile: full toylang compile via FakeProvider (scenario wp09)', () => {
@@ -84,6 +112,61 @@ describe('lsc compile: full toylang compile via FakeProvider (scenario wp09)', (
     expect(res.results?.coverage.ruleTypesMissing).toEqual([]);
     expect(res.synthesis.status).toBe('completed');
     expect(res.synthesis.summary).toMatchObject({ constructs: 8, validated: 8, rejected: 0, notJustified: 0 });
+  });
+
+  it('writes report.md and report.html into --out with the verdict, every outcome and the model source (D25 item 2)', async () => {
+    const res = await compile('wp09', '--sample', TOYLANG_SAMPLE);
+    const md = res.reportMd as string;
+    const html = res.reportHtml as string;
+    expect(md).toBeDefined();
+    expect(html).toBeDefined();
+    // Verdict line, with the unreviewed sample-match count.
+    const verdict = /^\*\*(VALIDATED — .*sample match(es)? not yet reviewed.*)\*\*$/m.exec(md)?.[1];
+    expect(verdict).toBeDefined();
+    expect(html).toContain(htmlEscaped(verdict as string));
+    expect(io.out.join('')).toContain(`(verdict: ${verdict as string})`);
+    // Lexical settings and every construct's synthesis outcome.
+    expect(md).toContain('## Lexical settings');
+    expect(md).toContain('**/*.tl');
+    expectEveryOutcome(res);
+    expect(synthesisSection(md)).toContain('attempt 1: **failed-tests** — read-03 (positive): missed line 1 table="order_lines"');
+    // The summary prints both paths.
+    const printed = io.out.join('');
+    expect(printed).toContain(`Wrote ${join(res.out, 'report.md')}`);
+    expect(printed).toContain(`Wrote ${join(res.out, 'report.html')}`);
+    expect(printed).toContain(`Report: ${join(res.out, 'report.md')} and ${join(res.out, 'report.html')}`);
+    // Provider, model and origin come from the recordings replayed (all hand-written).
+    expect(res.synthesis.modelSource).toEqual({
+      mode: 'replay',
+      configuredProvider: 'fake',
+      provider: 'hand-written',
+      model: 'hand-written',
+      origin: 'hand-written',
+      calls: [{ origin: 'hand-written', provider: 'hand-written', model: 'hand-written', calls: 10 }],
+      summary: 'replay of hand-written recordings (10 call(s); provider hand-written, model hand-written)',
+    });
+    expect(printed).toContain('Model source: replay of hand-written recordings (10 call(s)');
+  });
+
+  it('a replay mixing recording origins says "mixed", with counts', async () => {
+    const dir = join(tempDir(), 'recordings');
+    cpSync(recordingsDir('wp09'), dir, { recursive: true });
+    // Relabel two recordings as captured; the hash covers only the request, so they still replay.
+    const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort().slice(0, 2);
+    for (const f of files) {
+      const rec = JSON.parse(readFileSync(join(dir, f), 'utf8')) as Record<string, unknown>;
+      writeFileSync(join(dir, f), JSON.stringify({ ...rec, origin: 'recorded', provider: 'anthropic', model: 'toy-model-1' }));
+    }
+    const { config } = writeConfig();
+    const out = join(tempDir(), 'out');
+    expect(await runCli('compile', TOYLANG_SKILLS, '--provider', 'fake', '--recordings', dir, '--config', config, '--out', out)).toBe(0);
+    const synthesis = SynthesisReportSchema.parse(JSON.parse(readFileSync(join(out, 'synthesis.json'), 'utf8')));
+    expect(synthesis.modelSource).toMatchObject({ mode: 'replay', provider: 'mixed', model: 'mixed', origin: 'mixed' });
+    expect(synthesis.modelSource?.calls).toEqual([
+      { origin: 'hand-written', provider: 'hand-written', model: 'hand-written', calls: 8 },
+      { origin: 'recorded', provider: 'anthropic', model: 'toy-model-1', calls: 2 },
+    ]);
+    expect(synthesis.modelSource?.summary).toBe('replay of mixed recordings: 2 recorded, 8 hand-written (10 call(s); provider mixed, model mixed)');
   });
 
   it('logs every request once, and uses every recording exactly once', async () => {
@@ -163,6 +246,28 @@ describe('lsc compile: a construct that never converges (scenario wp09-reject)',
     expect(io.out.join('')).toMatch(/REJECTED\s+call\s+3 attempt\(s\)/);
   });
 
+  it('the report written by compile shows call as rejected with its reasons, and the REJECTED verdict', async () => {
+    const res = await compile('wp09-reject');
+    const md = res.reportMd as string;
+    const html = res.reportHtml as string;
+    const verdict = /^\*\*(REJECTED — .*)\*\*$/m.exec(md)?.[1];
+    expect(verdict).toBeDefined();
+    expect(verdict).toContain('no unreviewed sample matches'); // no --sample in this run
+    expect(html).toContain(htmlEscaped(verdict as string));
+    expectEveryOutcome(res);
+    const call = res.synthesis.constructs.find((c) => c.constructId === 'call');
+    const reason = call?.reason as string;
+    const section = synthesisSection(md);
+    expect(section).toContain(`- \`call\` (call) — **rejected** (rule \`call\`), 3 attempt(s): ${reason}`);
+    expect(section).toContain('attempt 1: **invalid-output** — invalid_json:');
+    expect(section).toContain('[re2-compile]');
+    expect(section).toContain('expected callee="apply_discount", module="billing" got callee="billing"');
+    expect(html).toContain(htmlEscaped(reason));
+    expect(section).toMatch(/- `config-flag` \(config_ref\) — \*\*not-justified\*\*[^\n]*exercises the path where the model declines/);
+    // The lexical refusal and its reason are visible too.
+    expect(res.synthesis.lexical.attempts[0]?.outcome).toBe('unjustified-settings');
+  });
+
   it('records "not justified" as no rule plus the stated reason', async () => {
     const res = await compile('wp09-reject');
     const flag = res.synthesis.constructs.find((c) => c.constructId === 'config-flag');
@@ -207,6 +312,10 @@ describe('lsc compile: infrastructure failures stop the compile honestly', () =>
     const synthesis = SynthesisReportSchema.parse(JSON.parse(readFileSync(join(out, 'synthesis.json'), 'utf8')));
     expect(synthesis.error).toMatch(/^UnknownRecordingError/);
     expect(synthesis.lexical.status).toBe('not-attempted');
+    // No Rule Set means no results to report on; the summary says so instead of writing an empty report.
+    expect(existsSync(join(out, 'report.md'))).toBe(false);
+    expect(io.out.join('')).toContain('Report: not written (no draft Rule Set');
+    expect(synthesis.modelSource).toMatchObject({ mode: 'replay', origin: 'none', provider: 'none', calls: [] });
   });
 
   it('without a provider it fails with a clear message', async () => {

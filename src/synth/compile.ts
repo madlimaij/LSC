@@ -17,6 +17,7 @@ import { LlmError, type LlmProvider } from '../llm/index.js';
 import { runRules, type Results, type SampleFile } from '../runner/index.js';
 import { synthesizeConstruct, type ConstructOutcome } from './construct-loop.js';
 import { synthesizeLexical, type LexicalOutcome } from './lexical.js';
+import { buildModelSource, type ModelSourceInput } from './model-source.js';
 import type { LexicalDoc, PromptLimits } from './prompts.js';
 import type { ConstructSynthesis, SynthesisReport } from './synthesis-schema.js';
 
@@ -34,6 +35,8 @@ export interface CompileOptions {
   readonly maxAttempts: number;
   readonly maxOutputTokens: number;
   readonly compilerVersion: string;
+  /** Configured provider (and recordings, for a replay); adds `modelSource` to synthesis.json (D25 item 2). */
+  readonly modelSource?: ModelSourceInput;
   readonly now?: () => Date;
   readonly limits?: PromptLimits;
   readonly ingest?: IngestOptions;
@@ -175,6 +178,9 @@ export async function compileLanguage(options: CompileOptions): Promise<CompileO
       outputTokens: attempts.reduce((sum, a) => sum + a.usage.outputTokens, 0),
       calls: attempts.length,
     },
+    ...(options.modelSource !== undefined
+      ? { modelSource: buildModelSource(options.modelSource, attempts.map((a) => a.requestHash)) }
+      : {}),
     ingestDiagnostics: ingest.diagnostics.map(formatLoadError),
   };
 

@@ -6,6 +6,7 @@ export * from './types.js';
 export * from './prompts.js';
 export * from './lexical.js';
 export * from './construct-loop.js';
+export * from './model-source.js';
 export * from './synthesis-schema.js';
 export * from './compile.js';
 export * from './guard.js';

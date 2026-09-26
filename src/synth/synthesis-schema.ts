@@ -6,6 +6,7 @@
  */
 import { z } from 'zod';
 import { DelimiterPairSchema, RuleTypeSchema } from '../contract/index.js';
+import { ModelSourceSchema } from './model-source.js';
 import { LexicalProposalSchema, RuleDraftSchema } from './schema.js';
 
 const UsageSchema = z.strictObject({
@@ -89,6 +90,11 @@ export const SynthesisReportSchema = z.strictObject({
     outputTokens: z.int().min(0),
     calls: z.int().min(0),
   }),
+  /**
+   * Provider, model and recording origin of the model answers (D25 item 2; see model-source.ts).
+   * Always written by `lsc compile`; optional only so synthesis.json files written before it still parse.
+   */
+  modelSource: ModelSourceSchema.optional(),
   /** Ingestion diagnostics (`file:line: message`). */
   ingestDiagnostics: z.array(z.string()),
 });

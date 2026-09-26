@@ -2,7 +2,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Command } from 'commander';
 import { exampleLocations } from '../../examples/index.js';
-import { createSession, LlmConfigError, loadConfig, type LlmConfig } from '../../llm/index.js';
+import { createSession, LlmConfigError, loadConfig, loadRecordings, type LlmConfig } from '../../llm/index.js';
+import { renderReportFiles } from '../../report/index.js';
 import { ResultsSchema } from '../../runner/index.js';
 import {
   assertRecordingAllowed,
@@ -12,12 +13,13 @@ import {
   RecordingRefusedError,
   SynthesisReportSchema,
   type CompileOutput,
+  type ModelSourceInput,
 } from '../../synth/index.js';
 import { getPackageInfo } from '../package-info.js';
 
 export const name = 'compile';
 export const description =
-  'Full pipeline: ingest Skill files, synthesise rules with the configured model, test and refine them, write a draft Rule Set';
+  'Full pipeline: ingest Skill files, synthesise rules with the configured model, test and refine them, write a draft Rule Set and the report';
 
 interface Options {
   readonly sample?: string;
@@ -58,6 +60,18 @@ function selectProvider(config: LlmConfig, options: Options): LlmConfig {
   return config;
 }
 
+/** What synthesis.json records about the provider (D25 item 2): configured provider and model, or the recordings replayed. */
+function modelSourceInput(config: LlmConfig): ModelSourceInput {
+  const pc = config.provider;
+  if (pc === undefined) throw new UsageError('no model provider configured');
+  switch (pc.name) {
+    case 'fake':
+      return { mode: 'replay', provider: pc.name, recordings: loadRecordings(pc.recordingsDir) };
+    case 'anthropic':
+      return { mode: config.recording !== undefined ? 'live-recording' : 'live', provider: pc.name, model: pc.model };
+  }
+}
+
 function parseAttempts(value: string | undefined, fallback: number): number {
   if (value === undefined) return fallback;
   const n = Number(value);
@@ -65,7 +79,7 @@ function parseAttempts(value: string | undefined, fallback: number): number {
   return n;
 }
 
-function printSummary(output: CompileOutput, files: string[], logPath: string, budget: { used: number; max: number }, skillsDir: string): void {
+function printSummary(output: CompileOutput, files: string[], logPath: string, budget: { used: number; max: number }, report: string | undefined): void {
   const { synthesis } = output;
   const w = (line: string): void => {
     process.stdout.write(`${line}\n`);
@@ -111,14 +125,10 @@ function printSummary(output: CompileOutput, files: string[], logPath: string, b
     `Model usage: ${String(synthesis.usage.calls)} call(s), ${String(synthesis.usage.inputTokens)} input + ${String(synthesis.usage.outputTokens)} output tokens ` +
       `(budget used ${String(budget.used)} of ${String(budget.max)})`,
   );
+  if (synthesis.modelSource !== undefined) w(`Model source: ${synthesis.modelSource.summary}`);
   w(`Snippet log: ${logPath}`);
   for (const file of files) w(`Wrote ${file}`);
-  const resultsFile = files.find((f) => f.endsWith('results.json'));
-  const draftFile = files.find((f) => f.endsWith('.ruleset.draft.json'));
-  if (resultsFile !== undefined && draftFile !== undefined) {
-    // Integration point with WP-07: the report is rendered by `lsc report` from these two files.
-    w(`Report: lsc report ${resultsFile} --ruleset ${draftFile} --skills-dir ${skillsDir}`);
-  }
+  w(report ?? 'Report: not written (no draft Rule Set, so no results to report on; see synthesis.json)');
 }
 
 export function configure(cmd: Command): void {
@@ -154,6 +164,7 @@ export function configure(cmd: Command): void {
           maxAttempts,
           maxOutputTokens: Math.min(DEFAULT_MAX_OUTPUT_TOKENS, config.budgets.maxOutputTokensPerCall),
           compilerVersion: getPackageInfo().version,
+          modelSource: modelSourceInput(config),
         });
 
         mkdirSync(options.out, { recursive: true });
@@ -165,12 +176,27 @@ export function configure(cmd: Command): void {
         };
         if (output.ruleSet !== undefined) write(`${languageId}.ruleset.draft.json`, output.ruleSet);
         if (output.results !== undefined) write('results.json', ResultsSchema.parse(output.results));
-        write('synthesis.json', SynthesisReportSchema.parse(output.synthesis));
+        const synthesis = SynthesisReportSchema.parse(output.synthesis);
+        write('synthesis.json', synthesis);
+
+        // D25 item 2: the report (WP-07) is written here too, from the same data.
+        let reportLine: string | undefined;
+        if (output.results !== undefined && output.ruleSet !== undefined) {
+          const report = renderReportFiles({
+            results: output.results,
+            ruleSet: output.ruleSet,
+            examples: output.ingest.constructs.flatMap((c) => c.examples),
+            synthesis,
+            outDir: options.out,
+          });
+          files.push(report.markdownPath, report.htmlPath);
+          reportLine = `Report: ${report.markdownPath} and ${report.htmlPath} (verdict: ${report.report.overall.summary})`;
+        }
 
         printSummary(output, files, session.log.path, {
           used: session.budget.totalUsed,
           max: session.budget.limits.maxTotalTokensPerCompile,
-        }, skillsDir);
+        }, reportLine);
 
         const s = output.synthesis;
         if (s.status !== 'completed') process.exitCode = EXIT_FAILED;

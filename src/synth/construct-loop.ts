@@ -129,6 +129,19 @@ function describeFailure(result: ExampleResult, example: Example | undefined): s
   return `${label}${origin}: ${details.join('; ')}`;
 }
 
+const REVIEW_TAG = ' [review example]';
+
+/**
+ * A failure line for the construct's `reason` (a one-line summary shown by
+ * `lsc compile` and the report): a review example's captured text is
+ * repository-sample text (D9), so only its id and the tag are kept. The full
+ * line stays in the attempt's `problems` in synthesis.json.
+ */
+export function summaryProblem(problem: string): string {
+  const at = problem.indexOf(REVIEW_TAG);
+  return at === -1 ? problem : `${problem.slice(0, at + REVIEW_TAG.length)}: details withheld (repository-sample text)`;
+}
+
 function finalRule(rule: Rule, result: RuleResultWithoutSamples, status: Rule['status']): Rule {
   return {
     ...rule,
@@ -234,7 +247,7 @@ export async function synthesizeConstruct(provider: LlmProvider, options: Constr
   const last = attempts[attempts.length - 1];
   const reason =
     `no attempt passed within the cap of ${String(options.maxAttempts)} attempt(s)` +
-    (last !== undefined ? `; last attempt (${last.outcome}): ${last.problems.join(' | ')}` : '');
+    (last !== undefined ? `; last attempt (${last.outcome}): ${last.problems.map(summaryProblem).join(' | ')}` : '');
   if (lastRunnable === undefined) {
     return { constructId: construct.id, ruleType: type, status: 'rejected', reason, attempts };
   }
