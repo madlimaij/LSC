@@ -189,14 +189,19 @@ describe('ingestSkills: examples nested inside lists and blockquotes', () => {
     const negative = say?.examples.filter((e) => e.polarity === 'negative').length;
     expect(positive).toBe(1);
     expect(negative).toBe(2);
-    // Provenance: both nested examples keep their own fence line, not the enclosing list/blockquote's line.
-    const nested = say?.examples.filter((e) => e.id !== 'say-01') ?? [];
-    for (const example of nested) {
-      expect(example.source.kind).toBe('inline');
-      if (example.source.kind === 'inline') {
-        expect(example.source.skill).toBe('greet.md');
-        expect(example.source.line).toBeGreaterThan(1);
-      }
+    // Provenance: both nested examples keep their own fence line, not the enclosing list/blockquote's line
+    // (the list item starts at line 21, the blockquote at line 29; the fences are at 23 and 31).
+    const listExample = say?.examples.find((e) => e.id === 'say-neg-list');
+    const quoteExample = say?.examples.find((e) => e.id === 'say-neg-quote');
+    expect(listExample?.source.kind).toBe('inline');
+    if (listExample?.source.kind === 'inline') {
+      expect(listExample.source.skill).toBe('greet.md');
+      expect(listExample.source.line).toBe(23);
+    }
+    expect(quoteExample?.source.kind).toBe('inline');
+    if (quoteExample?.source.kind === 'inline') {
+      expect(quoteExample.source.skill).toBe('greet.md');
+      expect(quoteExample.source.line).toBe(31);
     }
     // Both nested examples belong to the heading that encloses them (the "Traps" subsection), same anchor as the top-level one.
     expect(say?.anchor).toBe('greet.md#saying-hello');
