@@ -8,7 +8,7 @@
 | WP-03 | Example format + toylang | contract-architect | WP-02 | done (reviewed wave 1) |
 | WP-04 | Rule engines | engine-builder | WP-02, WP-03 | round 1 fixed; owner-decision changes (D19) in progress |
 | WP-05 | Test runner | engine-builder | WP-04 | round 1 fixed; owner-decision changes (D19) in progress |
-| WP-06 | Skill ingestion | skill-ingester | WP-03 | round 1 fixed; owner-decision changes (D19) in progress |
+| WP-06 | Skill ingestion | skill-ingester | WP-03 | round 1 fixed; awaiting re-review |
 | WP-07 | Report + review CLI | report-builder | WP-05 | not started |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | not started |
