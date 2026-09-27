@@ -55,6 +55,19 @@ async function compile(skillsDir: string, recordings: string, ...extra: string[]
 
 const readRuleSet = (path: string): RuleSet => JSON.parse(readFileSync(path, 'utf8')) as RuleSet;
 
+/** Items of report.md's "What to do next" list (empty when the list says "Nothing"). */
+function whatNext(markdown: string): string[] {
+  const lines = markdown.split('\n');
+  const start = lines.indexOf('**What to do next**');
+  expect(start).toBeGreaterThanOrEqual(0);
+  const items: string[] = [];
+  for (const line of lines.slice(start + 2)) {
+    if (!line.startsWith('- ')) break;
+    items.push(line);
+  }
+  return items;
+}
+
 describe('lsc compile --previous --export (WP-10 recompile)', () => {
   it('after editing db-write.md, only db-write reaches the provider, the export is 1.0.1 and the CHANGELOG names only db-write', async () => {
     const { skillsDir } = copyToylang();
@@ -68,6 +81,13 @@ describe('lsc compile --previous --export (WP-10 recompile)', () => {
     expect(first.synthesis.reuse).toBeUndefined();
     expect(first.stdout).toContain('Export toylang 1.0.0: first export, 8 validated rule(s)');
     expect(readRuleSet(release).version).toBe('1.0.0');
+    // D32 item 7: the report written into --out already names the export.
+    const firstReport = readFileSync(join(first.out, 'report.md'), 'utf8');
+    expect(firstReport).toContain(`exported as version 1.0.0 to ${release}`);
+    expect(firstReport).not.toContain('cannot be used yet');
+    expect(whatNext(firstReport).some((item) => /lsc export/.test(item))).toBe(false);
+    expect(readFileSync(join(first.out, 'report.html'), 'utf8')).toContain('exported as version <code>1.0.0</code>');
+    expect(first.stdout).toContain('Report updated with the export:');
     // The draft is still written next to the other outputs, unchanged in kind.
     expect(readRuleSet(join(first.out, 'toylang.ruleset.draft.json')).version).toBe('0.0.0-draft');
 
@@ -243,6 +263,28 @@ describe('lsc compile --previous --export (WP-10 recompile)', () => {
     expect(io.err.join('')).toMatch(/--export: not exported, because the compile did not complete \(status aborted\)/);
     expect(existsSync(join(out, 'toylang.ruleset.draft.json'))).toBe(true);
     expect(existsSync(release)).toBe(false);
+  });
+
+  it('a refused export leaves the report as a draft report: no export line, and the export item stays in "What to do next"', async () => {
+    const { skillsDir } = copyToylang();
+    const release = join(tempDir(), 'toylang.ruleset.json');
+    const plain = await compile(skillsDir, recordingsDir('wp09'));
+    const plainReport = readFileSync(join(plain.out, 'report.md'), 'utf8');
+    expect(plainReport).not.toContain('exported as version');
+    expect(whatNext(plainReport).some((item) => /lsc export/.test(item))).toBe(true);
+
+    // Refused after the compile: exportFiles finds the CHANGELOG already holds a different 1.0.0 entry.
+    writeFileSync(join(release, '..', 'CHANGELOG.md'), '# Changelog\n\n## toylang 1.0.0\n\n- a different first export\n');
+    const refused = await compile(skillsDir, recordingsDir('wp09'), '--export', release);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain('--export: ');
+    expect(existsSync(release)).toBe(false);
+    const report = readFileSync(join(refused.out, 'report.md'), 'utf8');
+    expect(report).not.toContain('exported as version');
+    expect(report).toContain('cannot be used yet');
+    expect(whatNext(report).some((item) => /lsc export/.test(item))).toBe(true);
+    expect(readFileSync(join(refused.out, 'report.html'), 'utf8')).not.toContain('exported as version');
+    expect(refused.stdout).not.toContain('Report updated with the export');
   });
 
   it('a synthesis.json written before the reuse fields still loads', async () => {

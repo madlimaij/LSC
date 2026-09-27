@@ -16,7 +16,7 @@ import {
   VersionError,
   type ExportFilesResult,
 } from '../../release/index.js';
-import { renderReportFiles } from '../../report/index.js';
+import { renderReportFiles, type ExportedInfo } from '../../report/index.js';
 import { ResultsSchema } from '../../runner/index.js';
 import {
   assertRecordingAllowed,
@@ -289,15 +289,21 @@ export function configure(cmd: Command): void {
         write('synthesis.json', synthesis);
 
         // D25 item 2: the report (WP-07) is written here too, from the same data.
+        const { results, ruleSet } = output;
+        const writeReport = (exported?: ExportedInfo): ReturnType<typeof renderReportFiles> | undefined =>
+          results !== undefined && ruleSet !== undefined
+            ? renderReportFiles({
+                results,
+                ruleSet,
+                examples: output.ingest.constructs.flatMap((c) => c.examples),
+                synthesis,
+                ...(exported !== undefined ? { exported } : {}),
+                outDir: options.out,
+              })
+            : undefined;
         let reportLine: string | undefined;
-        if (output.results !== undefined && output.ruleSet !== undefined) {
-          const report = renderReportFiles({
-            results: output.results,
-            ruleSet: output.ruleSet,
-            examples: output.ingest.constructs.flatMap((c) => c.examples),
-            synthesis,
-            outDir: options.out,
-          });
+        const report = writeReport();
+        if (report !== undefined) {
           files.push(report.markdownPath, report.htmlPath);
           reportLine = `Report: ${report.markdownPath} and ${report.htmlPath} (verdict: ${report.report.overall.summary})`;
         }
@@ -319,13 +325,15 @@ export function configure(cmd: Command): void {
             process.exitCode = EXIT_FAILED;
             return;
           }
-          printExport(
-            exportFiles({
-              draft: output.ruleSet,
-              outPath: options.export,
-              ...(options.previous !== undefined ? { previousPath: options.previous } : {}),
-            }),
-          );
+          const exported = exportFiles({
+            draft: output.ruleSet,
+            outPath: options.export,
+            ...(options.previous !== undefined ? { previousPath: options.previous } : {}),
+          });
+          printExport(exported);
+          // D32 item 7: only after a successful export, re-write the report so it names the exported version and file.
+          const updated = writeReport({ version: exported.version, path: exported.outPath, changelogPath: exported.changelogPath });
+          if (updated !== undefined) process.stdout.write(`Report updated with the export: ${updated.markdownPath} and ${updated.htmlPath}\n`);
         }
       } catch (err) {
         if (err instanceof ExportError || err instanceof VersionError) {
