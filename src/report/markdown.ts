@@ -68,7 +68,10 @@ function snippetLines(snippet: LocatedSnippet | undefined, highlightLine?: numbe
  */
 function draftWarning(report: Report): string | undefined {
   if (report.ruleSetVersion !== '0.0.0-draft') return undefined;
-  return '**Draft Rule Set: must not be delivered to Navigator.** Version `0.0.0-draft` means `lsc export` has not yet assigned this Rule Set a real version (D24 g, D25 item 5).';
+  const base =
+    '**Draft Rule Set: must not be delivered to Navigator.** Version `0.0.0-draft` means `lsc export` has not yet assigned this Rule Set a real version (D24 g, D25 item 5).';
+  if (report.exported === undefined) return base;
+  return `${base} This draft was exported as version \`${report.exported.version}\` to \`${report.exported.path}\` — use that file, not this draft.`;
 }
 
 /**

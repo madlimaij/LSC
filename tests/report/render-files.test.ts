@@ -52,4 +52,25 @@ describe('renderReportFiles', () => {
     expect(report.lexical).toBeUndefined();
     expect(report.synthesis).toBeUndefined();
   });
+
+  // D32 item 7: `lsc compile --export` passes its export result through so the report it writes into
+  // `--out` already says the draft was exported, without a follow-up `lsc report` run.
+  it('passes `exported` through to the report and both rendered files, when given', () => {
+    const results = { ...runFixture(), ruleSetVersion: '0.0.0-draft' };
+    const { report, markdownPath, htmlPath } = renderReportFiles({
+      results,
+      exported: { version: '1.1.0', path: '/out/toylang.ruleset.json' },
+      outDir: tmp,
+    });
+
+    expect(report.exported).toEqual({ version: '1.1.0', path: '/out/toylang.ruleset.json' });
+    expect(readFileSync(markdownPath, 'utf8')).toContain('This draft was exported as version 1.1.0 to /out/toylang.ruleset.json');
+    expect(readFileSync(htmlPath, 'utf8')).toContain('This draft was exported as version 1.1.0 to /out/toylang.ruleset.json');
+  });
+
+  it('omits `exported` from the report when not given (no change from before)', () => {
+    const results = { ...runFixture(), ruleSetVersion: '0.0.0-draft' };
+    const { report } = renderReportFiles({ results, outDir: tmp });
+    expect(report.exported).toBeUndefined();
+  });
 });

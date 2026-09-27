@@ -296,10 +296,14 @@ function renderConstructLineHtml(c: NonNullable<Report['synthesis']>['constructs
  */
 function draftWarningHtml(report: Report): string {
   if (report.ruleSetVersion !== '0.0.0-draft') return '';
-  return (
-    '<p class="warn"><strong>Draft Rule Set: must not be delivered to Navigator.</strong> Version ' +
-    '<code>0.0.0-draft</code> means <code>lsc export</code> has not yet assigned this Rule Set a real version (D24 g, D25 item 5).</p>'
-  );
+  const base =
+    '<strong>Draft Rule Set: must not be delivered to Navigator.</strong> Version ' +
+    '<code>0.0.0-draft</code> means <code>lsc export</code> has not yet assigned this Rule Set a real version (D24 g, D25 item 5).';
+  const exportedNote =
+    report.exported !== undefined
+      ? ` This draft was exported as version <code>${esc(report.exported.version)}</code> to <code>${esc(report.exported.path)}</code> &mdash; use that file, not this draft.`
+      : '';
+  return `<p class="warn">${base}${exportedNote}</p>`;
 }
 
 /**

@@ -59,7 +59,9 @@ function statusParagraph(report: SummaryReport): string {
 
   const isDraft = report.ruleSetVersion === '0.0.0-draft';
   const usableClause = isDraft
-    ? 'This is a draft Rule Set, so it cannot be used yet — see "What to do next" below.'
+    ? report.exported !== undefined
+      ? `This draft was exported as version ${report.exported.version} to ${report.exported.path}; the exported Rule Set is the one to deliver to Navigator.`
+      : 'This is a draft Rule Set, so it cannot be used yet — see "What to do next" below.'
     : overall.verdict === 'validated'
       ? 'This Rule Set can be used.'
       : 'This Rule Set should not be used yet — see "What to do next" below.';
@@ -107,7 +109,12 @@ function notJustifiedConstructItems(report: SummaryReport): string[] {
   );
 }
 
-/** Owner priority order (D28): rejected rule, not-justified construct, unreviewed samples, hand-written answers, Skill drift, then export (last, only for a draft). */
+/**
+ * Owner priority order (D28): rejected rule, not-justified construct, unreviewed samples,
+ * hand-written answers, Skill drift, then export (last, only for a draft). D32 item 7: the export
+ * item is dropped entirely when `report.exported` is set — the draft was already exported by this
+ * same `lsc compile --export` run, so there is nothing left to export.
+ */
 export function buildWhatNext(report: SummaryReport): string[] {
   const items: string[] = [...rejectedRuleItems(report), ...notJustifiedConstructItems(report)];
 
@@ -126,7 +133,7 @@ export function buildWhatNext(report: SummaryReport): string[] {
     items.push('The Skill files changed since this Rule Set was built: run `lsc compile` again');
   }
 
-  if (report.ruleSetVersion === '0.0.0-draft') {
+  if (report.ruleSetVersion === '0.0.0-draft' && report.exported === undefined) {
     items.push(
       items.length === 0
         ? 'Nothing else to do: export the Rule Set with `lsc export` (only exported Rule Sets go to Navigator)'

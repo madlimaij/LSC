@@ -20,7 +20,7 @@ import { buildReport } from './build.js';
 import { indexExamplesById } from './example-location.js';
 import { renderHtml } from './html.js';
 import { renderMarkdown } from './markdown.js';
-import type { Report } from './model.js';
+import type { ExportedInfo, Report } from './model.js';
 
 export interface RenderReportFilesOptions {
   readonly results: Results;
@@ -30,6 +30,12 @@ export interface RenderReportFilesOptions {
   readonly examples?: readonly Example[];
   /** Adds each construct's synthesis outcome and reasons (D25 item 2). */
   readonly synthesis?: SynthesisReport;
+  /**
+   * This draft's own `lsc compile --export` result, when called right after it in the same run
+   * (D32 item 7, `buildReport`'s `exported` option): the Summary then says the draft was exported
+   * (dropping the "export the Rule Set" next-step item) and the draft warning names the exported file.
+   */
+  readonly exported?: ExportedInfo;
   /** Directory the two files are written into (created if missing). */
   readonly outDir: string;
   /** File name without extension for both files (default `"report"`, i.e. `report.md` / `report.html`). */
@@ -48,6 +54,7 @@ export function renderReportFiles(options: RenderReportFilesOptions): RenderRepo
     ...(options.ruleSet !== undefined ? { ruleSet: options.ruleSet } : {}),
     ...(options.examples !== undefined ? { examplesById: indexExamplesById(options.examples) } : {}),
     ...(options.synthesis !== undefined ? { synthesis: options.synthesis } : {}),
+    ...(options.exported !== undefined ? { exported: options.exported } : {}),
   });
 
   mkdirSync(options.outDir, { recursive: true });

@@ -190,6 +190,59 @@ describe('buildReport summary (D28)', () => {
     expect(summarySectionHtml).not.toMatch(INTERNAL_REFERENCE);
   });
 
+  // D32 item 7: after `lsc compile --export`, the report says the draft was exported instead of just
+  // warning it cannot be used yet.
+  describe('exported draft (D32 item 7)', () => {
+    it('names the exported version and path instead of "cannot be used yet", and drops the export item', () => {
+      const results = { ...runFixture(), ruleSetVersion: '0.0.0-draft' };
+      const report = buildReport(results, { exported: { version: '1.1.0', path: '/out/toylang.ruleset.json' } });
+
+      expect(report.summary.paragraphs.join(' ')).toContain(
+        'This draft was exported as version 1.1.0 to /out/toylang.ruleset.json; the exported Rule Set is the one to deliver to Navigator.',
+      );
+      expect(report.summary.paragraphs.join(' ')).not.toContain('cannot be used yet');
+      expect(report.summary.whatNext.some((item) => item.includes('export the Rule Set'))).toBe(false);
+      expect(report.summary.status).toBe('ready');
+    });
+
+    it('has no effect when absent: the usual draft "cannot be used yet" wording and export item stay', () => {
+      const results = { ...runFixture(), ruleSetVersion: '0.0.0-draft' };
+      const report = buildReport(results);
+
+      expect(report.summary.paragraphs.join(' ')).toContain('This is a draft Rule Set, so it cannot be used yet');
+      expect(report.summary.whatNext).toEqual([
+        'Nothing else to do: export the Rule Set with `lsc export` (only exported Rule Sets go to Navigator)',
+      ]);
+    });
+
+    it('still lists other "what to do next" items ahead of a dropped export item, when there are any', () => {
+      const draftResults = { ...runFixture(undefined, loadSampleFiles()), ruleSetVersion: '0.0.0-draft' };
+      const withoutExported = buildReport(draftResults, { synthesis: fakeSynthesis() });
+      const withExported = buildReport(draftResults, {
+        synthesis: fakeSynthesis(),
+        exported: { version: '1.1.0', path: '/out/toylang.ruleset.json' },
+      });
+      // Sanity: without `exported`, the equivalent report still ends with the export item (existing behaviour).
+      expect(withoutExported.summary.whatNext.some((item) => item.includes('export the Rule Set'))).toBe(true);
+      // With `exported`, no item mentions exporting, but the other items (review, hand-written) stay.
+      expect(withExported.summary.whatNext.some((item) => item.includes('export the Rule Set'))).toBe(false);
+      expect(withExported.summary.whatNext.length).toBe(withoutExported.summary.whatNext.length - 1);
+    });
+
+    it('the draft warning near the verdict keeps warning, but adds a note naming the exported file (both formats)', () => {
+      const results = { ...runFixture(), ruleSetVersion: '0.0.0-draft' };
+      const report = buildReport(results, { exported: { version: '1.1.0', path: '/out/toylang.ruleset.json' } });
+
+      const md = renderMarkdown(report);
+      expect(md).toContain('**Draft Rule Set: must not be delivered to Navigator.**');
+      expect(md).toContain('This draft was exported as version `1.1.0` to `/out/toylang.ruleset.json`');
+
+      const html = renderHtml(report);
+      expect(html).toContain('<strong>Draft Rule Set: must not be delivered to Navigator.</strong>');
+      expect(html).toContain('This draft was exported as version <code>1.1.0</code> to <code>/out/toylang.ruleset.json</code>');
+    });
+  });
+
   // WP-07 follow-up: `lsc compile --previous` reuses unchanged rules (docs/progress.md "WP-10 compile
   // wiring"). The summary must name the recompile in plain words and keep "what to do next" correct.
   describe('recompile (--previous)', () => {

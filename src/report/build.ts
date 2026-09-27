@@ -13,6 +13,7 @@ import { declaredMismatchNote, deriveConfidenceStats, explainConfidence } from '
 import { exampleSnippet } from './example-location.js';
 import type {
   CoverageRow,
+  ExportedInfo,
   ExtraMatchEntry,
   FalsePositiveEntry,
   LexicalSettingsView,
@@ -43,6 +44,11 @@ export interface BuildReportOptions {
    * compared against `ruleSet.sourceSkills` (reviewer Q5, D25 item 4). Needs `ruleSet` too.
    */
   readonly currentSourceSkills?: readonly SourceSkillLike[];
+  /**
+   * This draft's own `lsc compile --export` result, when the report is built right after it in the
+   * same run (D32 item 7): the version and path it was exported to (and changelog path, if written).
+   */
+  readonly exported?: ExportedInfo;
 }
 
 function snippetFor(exampleId: string, line: number, examplesById?: ReadonlyMap<string, Example>): LocatedSnippet | undefined {
@@ -293,6 +299,7 @@ export function buildReport(results: Results, options: BuildReportOptions = {}):
     ...(options.ruleSet !== undefined ? { sourceSkills: options.ruleSet.sourceSkills } : {}),
     ...(options.ruleSet !== undefined ? { lexical: buildLexical(options.ruleSet) } : {}),
     ...(options.synthesis !== undefined ? { synthesis: buildSynthesisView(options.synthesis) } : {}),
+    ...(options.exported !== undefined ? { exported: options.exported } : {}),
     ...(options.ruleSet !== undefined && options.currentSourceSkills !== undefined
       ? {
           skillHashMismatches: findSkillHashMismatches(options.ruleSet.sourceSkills, options.currentSourceSkills),

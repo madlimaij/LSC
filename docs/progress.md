@@ -660,3 +660,31 @@ Small follow-up to WP-07/WP-10: shows `synthesis.json`'s new recompile fields (`
 - The diff trusts `status: "validated"` and does not re-run tests. So a hand-edited draft that swaps two roles' groups without changing the regex would export as a patch although its output changed. This is safe for drafts from `lsc compile`, where a rule is validated only if it passed its examples. The validator does not check this, and D33 records the assumption.
 - CONTRACT.md §2 still says "the patch level it implements (1.0.2 now)". That was already stale at 1.0.4. I left it unchanged because it is outside this change; a later wording patch could fix it.
 - Navigator must be sent the new schema file (§8 item 5).
+
+### Report: exported-as line (D32 item 7) (`report-builder`, 2026-09-27)
+
+**What was built:**
+- `src/report/model.ts`: new `ExportedInfo` (`{ version, path, changelogPath? }`) and `Report.exported?: ExportedInfo` — present only when the draft this report was built from was just exported by the same `lsc compile --export` run.
+- `src/report/build.ts`: `BuildReportOptions.exported?: ExportedInfo`, passed straight into the model when given.
+- `src/report/render-files.ts`: `RenderReportFilesOptions.exported?: ExportedInfo`, passed straight into `buildReport`. `llm-integrator` wires this from `compile.ts`'s export result next (not part of this work package — `src/compile*` is untouched).
+- `src/report/summary.ts`:
+  - `statusParagraph`: when the Rule Set is the `0.0.0-draft` version and `report.exported` is set, the sentence becomes "This draft was exported as version \<version\> to \<path\>; the exported Rule Set is the one to deliver to Navigator." instead of "This is a draft Rule Set, so it cannot be used yet …". Unaffected otherwise.
+  - `buildWhatNext`: the "export the Rule Set with `lsc export`" item is only added when `report.ruleSetVersion === '0.0.0-draft' && report.exported === undefined`. Everything else in the priority order (rejected rule, not-justified construct, unreviewed samples, hand-written, Skill drift) is unchanged, so an exported draft with other open items still lists them, just without the export step tacked on at the end.
+- `src/report/markdown.ts` / `src/report/html.ts`: `draftWarning` / `draftWarningHtml` keep the existing "Draft Rule Set: must not be delivered to Navigator" warning unconditionally, and append one more sentence naming the exported version and path when `report.exported` is set ("This draft was exported as version `<version>` to `<path>` — use that file, not this draft.").
+- `src/report/README.md`: documented the new `exported` option on `buildReport` and `renderReportFiles`, and its three effects (Summary wording, dropped what-next item, draft-warning note).
+- Tests (both formats, per the brief):
+  - `tests/report/summary.test.ts` — new `describe('exported draft (D32 item 7)', …)`: the exported-as sentence and dropped "cannot be used yet"/export item when `exported` is given; the unchanged wording and export item when it is absent; that other what-next items (review, hand-written) survive alongside the dropped export item; and that both `renderMarkdown`/`renderHtml` show the draft warning plus the new note.
+  - `tests/report/render-files.test.ts` — `exported` passed through to `report.exported` and appearing verbatim in both written files; absent by default (no regression).
+
+**Acceptance criteria:**
+- `renderReportFiles`/`buildReport` accept optional `exported`: met (`build.ts`, `render-files.ts`).
+- Summary says the draft was exported, naming version and path: met (`summary.test.ts` "names the exported version and path …").
+- "What to do next" drops the export item when `exported` is present: met (same test file; also "still lists other … items ahead of a dropped export item").
+- Draft warning in the verdict area stays, with a short note pointing at the exported file: met ("the draft warning near the verdict keeps warning, but adds a note …", both formats).
+- Absent input, no change: met ("has no effect when absent" in both `summary.test.ts` and `render-files.test.ts`).
+- Round-trips through the Example loader from `src/examples`: unaffected — this change adds no new Example-shaped data; existing round-trip tests (`build.test.ts`, `render-files.test.ts`) still pass unchanged.
+- `npm run typecheck`, `npm run lint`, `npm test`: all clean (`npm test`: 71 files, 762 tests passed).
+
+**Deviations:** None from the brief. `changelogPath` is defined on `ExportedInfo` per the brief's example shape but is not yet read by any renderer (no requirement named a place to show it); left for `llm-integrator`/a future note if a reader needs it.
+
+**Open questions:** None new. `compile.ts` wiring (passing `exported` after a successful `--export`) is explicitly left to `llm-integrator`, per the task.

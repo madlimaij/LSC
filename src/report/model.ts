@@ -225,6 +225,18 @@ export interface SynthesisView {
   readonly providerNote?: string;
 }
 
+/**
+ * D32 item 7: when a report is built right after `lsc compile --export`, the export that just
+ * produced from this same draft — version and path (plus, when written, the changelog path) so the
+ * Summary and the draft warning can point at the file that is actually safe to deliver to Navigator,
+ * instead of telling the reader to run `lsc export` on a draft that is already exported.
+ */
+export interface ExportedInfo {
+  readonly version: string;
+  readonly path: string;
+  readonly changelogPath?: string;
+}
+
 /** One Skill file whose hash in the Rule Set's `sourceSkills` no longer matches the file at `--skills-dir` (or is missing there), reviewer Q5 / D25 item 4. */
 export interface SkillHashMismatch {
   readonly path: string;
@@ -279,4 +291,10 @@ export interface Report {
    * empty when there are none.
    */
   readonly newSkillFiles?: readonly string[];
+  /**
+   * Present when this draft was just exported by the same `lsc compile --export` run that produced
+   * this report (D32 item 7). Absent otherwise, including for a report built from an already-exported
+   * (non-draft) Rule Set — this field only ever accompanies `ruleSetVersion === '0.0.0-draft'`.
+   */
+  readonly exported?: ExportedInfo;
 }
