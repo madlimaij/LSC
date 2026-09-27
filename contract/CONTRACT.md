@@ -1,4 +1,4 @@
-# Rule Set contract 1.0.4
+# Rule Set contract 1.0.5
 
 This is the contract between the Language Skill Compiler (`lsc`) and Legacy Navigator's CustomLanguageAdapter. It covers the Rule Set JSON file: what it contains, the rules it must follow, and how a consumer must apply it so that Navigator finds exactly what `lsc` tested.
 
@@ -14,7 +14,7 @@ Fixtures:
 - `contract/fixtures/toylang.ruleset.json`: a valid Rule Set for the synthetic language `toylang`, one or more rules per rule type, both engines.
 - `contract/fixtures/invalid/<rule>--<variant>.json`: each file breaks exactly one validation rule; `<rule>` is the rule code from §5.
 
-Plan references: `docs/PLAN.md` §5 (contract), D1–D4, D6. Decisions made while implementing it: `docs/DECISIONS.md` D11–D14; approval at G1: D16; later changes: D19, D20, D21, D22, D26, D30 (history in §8).
+Plan references: `docs/PLAN.md` §5 (contract), D1–D4, D6. Decisions made while implementing it: `docs/DECISIONS.md` D11–D14; approval at G1: D16; later changes: D19, D20, D21, D22, D26, D30, D33 (history in §8).
 
 ## Contents
 
@@ -47,7 +47,7 @@ that is: JSON path, rule code in brackets (§5), message.
 
 ## 2. Contract version and compatibility
 
-`contractVersion` is the version of the file *format* and of the consumer behaviour this document prescribes (semver). This contract is **1.0.4**.
+`contractVersion` is the version of the file *format* and of the consumer behaviour this document prescribes (semver). This contract is **1.0.5**.
 
 | Change to the format | Bump | Example |
 | --- | --- | --- |
@@ -71,11 +71,12 @@ Specifying consumer behaviour for a case this document previously left unspecifi
 
 | Change between two Rule Sets for the same language | Bump |
 | --- | --- |
-| A rule removed or renamed (`id` changed), or its output meaning changed: `type` changed, capture roles added, removed or remapped (a role mapped to a different group name) | major |
+| A rule removed or renamed (`id` changed), or its output meaning changed: `type` changed, capture roles added or removed | major |
 | A `fileMatchers` glob removed (files are no longer scanned) | major |
 | Rules added | minor |
 | A `fileMatchers` glob added | minor |
 | Patterns refined (engine, regex, exact tokens, `caseSensitive`, flags, `multiline`, `blockEnd`, `searchStrings`) with no change in meaning | patch |
+| Capture groups renamed: the same capture roles mapped to different group names (1.0.5, D33) | patch |
 | `lineComment`, `blockComment` or `stringDelimiters` changed | patch |
 | Metadata only: `confidence`, `sourceEvidence` or `tests` of a rule changed, a Skill file in `sourceSkills` edited, added or removed, rule order or `fileMatchers` order changed | patch |
 
@@ -87,6 +88,7 @@ Details (1.0.4, D30):
 - `searchStrings` absent and `false` are the same. Object key order never counts.
 - `compiledAt`, `compilerVersion`, `contractVersion` and `version` itself are not compared. If nothing else changed, `lsc export` keeps the previous version and rewrites the previous file unchanged, so one `languageId` + `version` always means one content.
 - A `confidence` change is a patch although a change to or from `low` adds or removes `uncertainties` records (§4.1 item 1): those records flag trust, they do not change what the other records mean.
+- Capture changes (1.0.5, D33): adding or removing a role is major, because it changes which fields the rule's records carry (§4.1). The same set of roles mapped to different group names is a patch, even when a role takes a group another role used before: Navigator's records are keyed by capture role, not group name (D2), and a validated rule has passed its examples with the expected capture for every role. When a group rename comes together with a role added or removed, the change is major.
 - A rename is a rule removed plus a rule added; `lsc export` reports it as one rename when the pair is unambiguous (same `type`, and the same matcher and captures or the same `sourceEvidence` sections).
 
 **Drafts are never delivered.** `lsc compile` writes a draft Rule Set with `version: "0.0.0-draft"` that may contain `rejected` rules (D24). It validates against this contract so that `lsc test` and `lsc report` can read it, but it is not for Navigator. A Rule Set written by `lsc export` always has a `version` of the form `major.minor.patch` with major ≥ 1 and no pre-release or build suffix, and contains only `validated` rules. A consumer should refuse a Rule Set whose `version` has a pre-release suffix (such as `0.0.0-draft`) or whose major is 0, and report it as "not an exported Rule Set".
@@ -281,6 +283,7 @@ History:
 | 1.0.2 | 2026-09-26 | Patch (owner decision on a question §9 listed as open, §2): an unnamed definition of a rule with `blockEnd` opens an anonymous scope. Its own `blockEnd` closes it (LIFO per rule), but it is never an enclosing symbol or fallback source (§4.1 item 2, §6.6, §9 Q9 b). Replaces the 1.0.1 text, under which its `blockEnd` closed the most recent open scope of the same rule. Matches the reference engine. File format, schema structure and validity unchanged. | D21, D22 |
 | 1.0.3 | 2026-09-26 | Patch (wording, §2): §4.1 item 4 and §6.6 say *named* scope, since anonymous scopes are never a source (as 1.0.2 already implied and the reference engine does). §7: `sourceSkills[].path` example added; `sourceEvidence` `skill` and `anchor` conventions written down (`skill` uses the `sourceSkills` path convention). The fixture Rule Set's paths corrected to that convention (they were relative to the Skill directory's parent). File format, schema structure and validity unchanged. | D26 |
 | 1.0.4 | 2026-09-26 | Patch (documentation of the content version, §2): §3 now classifies what 1.0.3 left open: `fileMatchers` globs removed (major) and added (minor), comment and string markers (patch), an engine switch with the same meaning (patch), metadata-only changes (patch), rule order (patch); only validated rules are compared; unchanged content keeps its version. §3 and §7 state that drafts (`0.0.0-draft`, may contain rejected rules) are never delivered and that a consumer should refuse a pre-release or 0.x `version`. File format, schema structure and validity unchanged. | D30 |
+| 1.0.5 | 2026-09-27 | Patch (documentation of the content version, §2): §3 reclassifies a pure capture-group rename (same capture roles, different group names) from major to patch. Adding or removing a capture role stays major. Content-version rules only; file format, schema structure and validity unchanged. | D32, D33 |
 
 ## 9. Open questions
 

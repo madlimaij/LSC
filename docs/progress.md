@@ -634,3 +634,29 @@ Small follow-up to WP-07/WP-10: shows `synthesis.json`'s new recompile fields (`
 - "An existing --export without --previous" now reports through the ExportError handler (`ERROR: --export: …`).
 
 **Open questions:** None new.
+
+### Contract 1.0.5: capture rename is a patch (D32) (`contract-architect`, 2026-09-27)
+
+**What was built:**
+- `contract/CONTRACT.md`: now 1.0.5. §3 table changes: a major row lists only capture roles "added or removed", and a new patch row covers a capture-group rename. A §3 detail bullet explains why. §8 has a 1.0.5 history row. D33 is added to the decision references.
+- `src/contract/version.ts`: `CONTRACT_VERSION = '1.0.5'`. `contract/rule-set.schema.json` re-exported; only the version strings changed.
+- `src/release/diff.ts`: `captureChangeEntry`. With the same role sets, the change is `captures-changed` / `patch` with "capture group(s) renamed, roles unchanged (…)". With any role added or removed, it is `major` with "capture roles changed (…)". The header table is updated.
+- Tests:
+  - `tests/release/diff.test.ts`: the old remap-is-major test is split into three: "capture roles added or removed are major", "capture groups renamed with the same roles are a patch (contract 1.0.5 §3, D33)" (covers both a swap and a regex-plus-captures rename), and "a group rename together with an added or removed role is still major".
+  - `tests/release/export.test.ts`: "a draft whose only change is a capture-group rename is a patch: 1.0.0 → 1.0.1, named in the CHANGELOG (D32 item 3, D33)".
+  - `tests/contract/fixtures.test.ts` and `tests/contract/validate-ruleset-cli.test.ts`: version literals updated.
+- `docs/DECISIONS.md`: D33.
+
+**Acceptance criteria:**
+- §3 updated and 1.0.5 published (version, schema, literals, §8 row): met. `tests/contract/fixtures.test.ts` pins `CONTRACT_VERSION` to 1.0.5, and the schema-in-sync test passes.
+- A remap with identical role sets is a patch: met. See the diff.test.ts tests above.
+- Export-level test (rename only → 1.0.1, named in the CHANGELOG): met. See the export.test.ts test above.
+- D33 appended: met.
+- `npm run typecheck` exit 0, `npm run lint` exit 0, `npm test`: 71 files, 756 tests passed.
+
+**Deviations:** None. The change kind stays `captures-changed` rather than a new kind, so no `ChangeKind` consumer changes.
+
+**Open questions / concerns:**
+- The diff trusts `status: "validated"` and does not re-run tests. So a hand-edited draft that swaps two roles' groups without changing the regex would export as a patch although its output changed. This is safe for drafts from `lsc compile`, where a rule is validated only if it passed its examples. The validator does not check this, and D33 records the assumption.
+- CONTRACT.md §2 still says "the patch level it implements (1.0.2 now)". That was already stale at 1.0.4. I left it unchanged because it is outside this change; a later wording patch could fix it.
+- Navigator must be sent the new schema file (§8 item 5).

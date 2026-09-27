@@ -270,3 +270,14 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
   7. After `lsc compile --export`, the report adds a line saying the draft was exported as version X.
 - **Reason:** Human gate G3 (docs/ORCHESTRATION.md §4).
 - **Affects:** contract 1.0.5 and src/release (item 3); src/report and compile.ts (item 7); Wave 5 waits for G4.
+
+## D33 — Contract 1.0.5: a pure capture-group rename is a patch
+
+- **Date:** 2026-09-27
+- **Author:** `contract-architect`, applying the project owner's G3 decision (D32 item 3)
+- **Decision:**
+  a. contract/CONTRACT.md §3: when a rule keeps the same set of capture roles but maps them to different group names, the content version gets a **patch** bump. This holds even when roles swap groups. Adding or removing a capture role stays **major**, and so does any capture change that includes an added or removed role. D30 a had called a remap major; this replaces that part of D30 a.
+  b. `src/release/diff.ts`: a `captures-changed` change is `patch` with the summary "capture group(s) renamed, roles unchanged (…)" when the role sets are equal. Otherwise it is `major` with "capture roles changed (…)". The change kind is still `captures-changed`, so no consumer of `ChangeKind` changes.
+  c. **Version: patch bump, 1.0.4 → 1.0.5.** The file format, schema structure and validity are unchanged; only the content-version rules (§2: documentation) change. `CONTRACT_VERSION` bumped, `contract/rule-set.schema.json` re-exported (only the version strings change), §8 history row added, version literals in `tests/contract/fixtures.test.ts` and `tests/contract/validate-ruleset-cli.test.ts` updated.
+- **Reason:** Navigator records are keyed by capture role, not group name (D2), and a validated rule has passed its examples with the expected capture for every role, so a group rename changes neither which records exist nor what they contain.
+- **Affects:** Navigator (§3; tell it with the new schema file, §8 item 5). `src/release/diff.ts`, `tests/release/diff.test.ts`, `tests/release/export.test.ts`. The diff does not re-check the tests: it relies on `status: "validated"` meaning the rule passed its examples.

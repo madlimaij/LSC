@@ -8,17 +8,18 @@
  * draft is therefore "removed" if the previous Rule Set had it.
  *
  * Classification (CONTRACT.md §3; the rows marked * were specified in
- * contract 1.0.4, D30):
+ * contract 1.0.4, D30; the row marked ** changed in contract 1.0.5, D33):
  *
  * | Change | Bump |
  * | --- | --- |
  * | rule removed, rule renamed (`id` changed) | major |
  * | `type` changed | major |
- * | capture roles added, removed or remapped (role → different group) | major |
+ * | capture roles added or removed | major |
  * | `fileMatchers` glob removed * | major |
  * | rule added | minor |
  * | `fileMatchers` glob added * | minor |
  * | matcher refined: `engine`, `exact`, `regex`, `blockEnd`, `searchStrings` | patch |
+ * | capture groups renamed: same roles, different group names ** | patch |
  * | `lineComment`, `blockComment`, `stringDelimiters` changed * | patch |
  * | `confidence`, `sourceEvidence`, `tests` changed * | patch |
  * | `sourceSkills` changed (a Skill file edited, added or removed) * | patch |
@@ -128,21 +129,52 @@ function describeMatcherChange(prev: Rule, next: Rule): string {
   return parts.join('; ');
 }
 
-function describeCaptureChange(prev: Rule, next: Rule): string {
-  const prevRoles = Object.keys(prev.captures).sort();
-  const nextRoles = Object.keys(next.captures).sort();
-  const added = nextRoles.filter((r) => !prevRoles.includes(r));
-  const removed = prevRoles.filter((r) => !nextRoles.includes(r));
-  const remapped = nextRoles.filter(
-    (r) => prevRoles.includes(r) && (prev.captures as Record<string, string>)[r] !== (next.captures as Record<string, string>)[r],
-  );
+interface CaptureChange {
+  readonly added: readonly string[];
+  readonly removed: readonly string[];
+  /** Roles present on both sides whose group name changed. */
+  readonly remapped: readonly string[];
+}
+
+function captureChange(prev: Rule, next: Rule): CaptureChange {
+  const prevCaptures = prev.captures as Record<string, string>;
+  const nextCaptures = next.captures as Record<string, string>;
+  const prevRoles = Object.keys(prevCaptures).sort();
+  const nextRoles = Object.keys(nextCaptures).sort();
+  return {
+    added: nextRoles.filter((r) => !prevRoles.includes(r)),
+    removed: prevRoles.filter((r) => !nextRoles.includes(r)),
+    remapped: nextRoles.filter((r) => prevRoles.includes(r) && prevCaptures[r] !== nextCaptures[r]),
+  };
+}
+
+function describeCaptureChange(prev: Rule, next: Rule, change: CaptureChange): string {
+  const prevCaptures = prev.captures as Record<string, string>;
+  const nextCaptures = next.captures as Record<string, string>;
   const parts: string[] = [];
-  if (added.length > 0) parts.push(`role(s) added: ${added.join(', ')}`);
-  if (removed.length > 0) parts.push(`role(s) removed: ${removed.join(', ')}`);
-  for (const r of remapped) {
-    parts.push(`role ${r} remapped: group ${String((prev.captures as Record<string, string>)[r])} → ${String((next.captures as Record<string, string>)[r])}`);
+  if (change.added.length > 0) parts.push(`role(s) added: ${change.added.join(', ')}`);
+  if (change.removed.length > 0) parts.push(`role(s) removed: ${change.removed.join(', ')}`);
+  for (const r of change.remapped) {
+    parts.push(`role ${r} remapped: group ${String(prevCaptures[r])} → ${String(nextCaptures[r])}`);
   }
   return parts.join('; ');
+}
+
+/**
+ * Capture change for one rule. Adding or removing a role changes which
+ * fields Navigator's records carry: major. The same roles under different
+ * group names is a patch (contract 1.0.5, D32 item 3, D33): records are
+ * keyed by role, not group name (D2), and a validated rule has proven its
+ * role captures on its examples.
+ */
+function captureChangeEntry(prev: Rule, next: Rule): Change {
+  const id = next.id;
+  const change = captureChange(prev, next);
+  const detail = describeCaptureChange(prev, next, change);
+  if (change.added.length === 0 && change.removed.length === 0) {
+    return { kind: 'captures-changed', bump: 'patch', ruleId: id, summary: `\`${id}\`: capture group(s) renamed, roles unchanged (${detail})` };
+  }
+  return { kind: 'captures-changed', bump: 'major', ruleId: id, summary: `\`${id}\`: capture roles changed (${detail})` };
 }
 
 function evidenceKey(rule: Rule): string {
@@ -177,7 +209,7 @@ function ruleChanges(prev: Rule, next: Rule): Change[] {
     changes.push({ kind: 'type-changed', bump: 'major', ruleId: id, summary: `\`${id}\`: type changed from ${prev.type} to ${next.type}` });
   }
   if (!same(prev.captures, next.captures)) {
-    changes.push({ kind: 'captures-changed', bump: 'major', ruleId: id, summary: `\`${id}\`: capture roles changed (${describeCaptureChange(prev, next)})` });
+    changes.push(captureChangeEntry(prev, next));
   }
   if (!same(matcherParts(prev), matcherParts(next))) {
     changes.push({ kind: 'pattern-changed', bump: 'patch', ruleId: id, summary: `\`${id}\`: pattern changed (${describeMatcherChange(prev, next)})` });

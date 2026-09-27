@@ -108,7 +108,7 @@ describe('diffRuleSets', () => {
     expect(diffRuleSets(prev, next).bump).toBe('major');
   });
 
-  it('capture roles added, removed or remapped are major', () => {
+  it('capture roles added or removed are major', () => {
     const prev = fixtureRuleSet();
     const added = withRule(prev, 'call-statement', (r) => r);
     const removedRole = withRule(prev, 'call-statement', (r) => ({ ...r, captures: { callee: 'callee' } }));
@@ -116,11 +116,43 @@ describe('diffRuleSets', () => {
     expect(diffRuleSets(removedRole, added).bump).toBe('major');
     expect(diffRuleSets(removedRole, added).changes[0]?.summary).toContain('role(s) added: module');
     expect(diffRuleSets(added, removedRole).changes[0]?.summary).toContain('role(s) removed: module');
+  });
 
+  it('capture groups renamed with the same roles are a patch (contract 1.0.5 §3, D33)', () => {
+    const prev = fixtureRuleSet();
     const remapped = withRule(prev, 'call-statement', (r) => ({ ...r, captures: { callee: 'module', module: 'callee' } }));
     const diff = diffRuleSets(prev, remapped);
-    expect(diff.bump).toBe('major');
+    expect(diff.bump).toBe('patch');
+    expect(diff.changes).toEqual([expect.objectContaining({ kind: 'captures-changed', bump: 'patch', ruleId: 'call-statement' })]);
+    expect(diff.changes[0]?.summary).toContain('capture group(s) renamed, roles unchanged');
     expect(diff.changes[0]?.summary).toContain('role callee remapped: group callee → module');
+
+    // The usual shape: the regex groups and the captures renamed together; both changes are patches.
+    const renamed = withRule(prev, 'call-statement', (r) => {
+      const rr = regex(r);
+      return {
+        ...rr,
+        regex: { ...rr.regex, pattern: rr.regex.pattern.replace('(?<callee>', '(?<proc>') },
+        captures: { callee: 'proc', module: 'module' },
+      };
+    });
+    const renamedDiff = diffRuleSets(prev, renamed);
+    expect(renamedDiff.bump).toBe('patch');
+    expect(renamedDiff.changes.map((c) => [c.kind, c.bump])).toEqual([
+      ['captures-changed', 'patch'],
+      ['pattern-changed', 'patch'],
+    ]);
+  });
+
+  it('a group rename together with an added or removed role is still major', () => {
+    const prev = withRule(fixtureRuleSet(), 'call-statement', (r) => ({ ...r, captures: { callee: 'callee' } }));
+    const next = withRule(fixtureRuleSet(), 'call-statement', (r) => ({ ...r, captures: { callee: 'module', module: 'callee' } }));
+    const diff = diffRuleSets(prev, next);
+    expect(diff.bump).toBe('major');
+    expect(diff.changes[0]).toMatchObject({ kind: 'captures-changed', bump: 'major' });
+    expect(diff.changes[0]?.summary).toContain('role(s) added: module');
+    expect(diff.changes[0]?.summary).toContain('role callee remapped: group callee → module');
+    expect(diffRuleSets(next, prev).changes[0]).toMatchObject({ kind: 'captures-changed', bump: 'major' });
   });
 
   it('a renamed rule (same type and matcher, new id) is major and reported as one rename', () => {

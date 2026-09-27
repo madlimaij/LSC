@@ -120,6 +120,28 @@ describe('exportRuleSet', () => {
     expect(result.changelogEntry).toContain('`config-flag`: removed (config_ref)');
   });
 
+  it('a draft whose only change is a capture-group rename is a patch: 1.0.0 → 1.0.1, named in the CHANGELOG (D32 item 3, D33)', () => {
+    const previous = exportRuleSet({ draft: fixtureDraft() }).ruleSet;
+    const draft = withRule(fixtureDraft(), 'call-statement', (r) => {
+      if (r.engine !== 'regex') throw new Error('expected a regex rule');
+      return {
+        ...r,
+        regex: { ...r.regex, pattern: r.regex.pattern.replace('(?<module>', '(?<mod>').replace('(?<callee>', '(?<proc>') },
+        captures: { callee: 'proc', module: 'mod' },
+      };
+    });
+    expect(validateRuleSet(draft).ok).toBe(true);
+    const result = exportRuleSet({ draft, previous });
+    expect(result).toMatchObject({ version: '1.0.1', previousVersion: '1.0.0', unchanged: false });
+    expect(result.diff.bump).toBe('patch');
+    expect(result.changelogEntry).toContain('## toylang 1.0.1');
+    expect(result.changelogEntry).toContain('### Refined (patch)');
+    expect(result.changelogEntry).not.toContain('### Breaking (major)');
+    expect(result.changelogEntry).toContain(
+      '`call-statement`: capture group(s) renamed, roles unchanged (role callee remapped: group callee → proc; role module remapped: group module → mod)',
+    );
+  });
+
   it('nothing changed: returns the previous Rule Set unchanged, keeps its version, no CHANGELOG entry', () => {
     const previous = exportRuleSet({ draft: fixtureDraft() }).ruleSet;
     const draft: RuleSet = { ...fixtureDraft(), compiledAt: '2031-01-01T00:00:00Z', compilerVersion: '0.2.0' };
