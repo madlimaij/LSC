@@ -255,3 +255,18 @@ Append-only. D1–D9 are defined in docs/PLAN.md §4. Add new decisions below as
   e. Wiring reuse, `--force` and `--export` into `compileLanguage` / `lsc compile` needs changes in `src/synth/` and `src/cli/commands/compile.ts` (owner `llm-integrator`). WP-10 lists those deliverables but does not own the folders. The proposed interface is in `src/release/README.md`; the request is in the WP-10 completion note.
 - **Reason:** Safety against overwriting a delivered version (b); honest re-testing (d); folder ownership (docs/ORCHESTRATION.md §2) (e).
 - **Affects:** `llm-integrator` (compile wiring), `report-builder` (a synthesis.json "reused" marker would need showing), G3.
+
+## D32 — Gate G3 approved; version-bump questions settled
+
+- **Date:** 2026-09-27
+- **Author:** orchestrator, recording the project owner's decision at G3
+- **Decision:** The project owner approved G3: the toylang MVP is complete enough to move to the real language (evidence: `.lsc/g3/traceability.md`; every criterion met except rules written by a real model, deferred to G4 per D25). With it, the owner accepted the reviewer's recommendations:
+  1. A confidence drop to `low` stays a patch (D30 c).
+  2. A removed `fileMatchers` glob stays major (D30 a).
+  3. A pure capture-group rename (same roles, different group names) becomes a **patch**. Adding or removing a capture role stays major. `contract-architect` applies this as contract 1.0.5.
+  4. Constructs rejected or not justified last time are always re-synthesised (D31 d); revisit at G4 if real-language costs call for it.
+  5. A general Skill file change does not force every construct to be rebuilt; reused rules are re-tested (D8).
+  6. Removing any Skill file re-synthesises the lexical settings (one extra model call): accepted.
+  7. After `lsc compile --export`, the report adds a line saying the draft was exported as version X.
+- **Reason:** Human gate G3 (docs/ORCHESTRATION.md §4).
+- **Affects:** contract 1.0.5 and src/release (item 3); src/report and compile.ts (item 7); Wave 5 waits for G4.

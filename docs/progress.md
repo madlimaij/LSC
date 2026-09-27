@@ -12,11 +12,11 @@
 | WP-07 | Report + review CLI | report-builder | WP-05 | done (G2 approved) |
 | WP-08 | Model provider layer | llm-integrator | WP-02 | done (reviewed wave 2) |
 | WP-09 | Synthesis loop | llm-integrator | WP-05, WP-06, WP-08 | done (reviewed wave 3, round 2); real run deferred to G4 (D25) |
-| WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | done (reviewed wave 4, round 2) |
+| WP-10 | Versioning and export | contract-architect | WP-07, WP-09 | done (G3 approved) |
 | WP-11 | Real-language acceptance | orchestrator | WP-10, WP-00, G4 | not started |
 | WP-12 | Extra engines (conditional) | engine-builder | WP-11 | not started |
 
-Gates: G1 ☑ G2 ☑ G3 ☐ G4 ☐
+Gates: G1 ☑ G2 ☑ G3 ☑ G4 ☐
 
 ## Completion notes
 
